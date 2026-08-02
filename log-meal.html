@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Move With Purpose · Log Meal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+const params = new URLSearchParams(window.location.search);
+const mealType = MEAL_LABELS[params.get('type')] ? params.get('type') : 'lunch';
+
+let userId;
+let items = [];
+let photoFile = null;
+
+function totals() {
+  return items.reduce((acc, i) => ({
+    calories: acc.calories + i.calories,
+    protein: acc.protein + i.protein,
+    carbs: acc.carbs + i.carbs,
+    fat: acc.fat + i.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+}
+
+function render() {
+  const t = totals();
+  document.getElementById('card').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.1rem;">
+      <a href="nutrition.html" style="line-height:0;"><i class="ti ti-x" style="font-size:17px; color:#8F867E;" aria-hidden="true"></i></a>
+      <p class="mwp-title" style="font-size:15px; margin:0; color:#8F867E; text-transform:uppercase;">Log Food · ${MEAL_LABELS[mealType]}</p>
+      <span style="width:17px;"></span>
+    </div>
+
+    <label for="photoInput" style="cursor:pointer; background:#FFFFFF; border:1.5px dashed #C4BEB4; border-radius:12px; aspect-ratio:16/9; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <i class="ti ti-camera" style="font-size:18px; color:#C4BEB4;" aria-hidden="true"></i>
+      <p class="mwp-body" style="font-size:11px; color:#C4BEB4; margin:0;">${photoFile ? photoFile.name : 'Add a photo'}</p>
+    </label>
+    <input type="file" id="photoInput" accept="image/*" style="display:none;" />
+
+    <p class="mwp-body" style="font-size:9.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">Add each item</p>
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+      <input type="text" id="itemName" placeholder="Search food, e.g. chicken breast" class="mwp-input" />
+      <div style="display:flex; gap:6px;">
+        <input type="number" id="itemAmount" placeholder="Amount" class="mwp-input" style="flex:1;" />
+        <select id="itemUnit" class="mwp-select" style="width:68px;">
+          <option>oz</option><option>g</option><option>cup</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input type="number" id="itemCalories" placeholder="Calories" class="mwp-input" style="flex:1;" />
+        <input type="number" id="itemProtein" placeholder="Protein g" class="mwp-input" style="flex:1;" />
+        <input type="number" id="itemCarbs" placeholder="Carbs g" class="mwp-input" style="flex:1;" />
+        <input type="number" id="itemFat" placeholder="Fat g" class="mwp-input" style="flex:1;" />
+      </div>
+      <button id="addItemBtn" class="mwp-body" style="align-self:flex-end; width:34px; height:34px; border-radius:50%; border:none; background:#8F867E; color:#FFFFFF; font-size:16px;" aria-label="Add item">+</button>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+      ${items.map((item, idx) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:9px; padding:9px 12px;">
+          <span class="mwp-body" style="font-size:11.5px; color:#8F867E;">${item.name} · ${item.amount}${item.unit}</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="mwp-body" style="font-size:10.5px; color:#8F867E; opacity:0.65;">${item.calories} cal</span>
+            <i class="ti ti-x" data-remove="${idx}" style="font-size:12px; color:#C4BEB4; cursor:pointer;" aria-hidden="true"></i>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div style="background:#8F867E; border-radius:11px; padding:12px; margin-bottom:1.15rem;">
+      <p class="mwp-body" style="font-size:9px; letter-spacing:0.5px; color:#EAE6E1; margin:0 0 6px; text-transform:uppercase;">Auto-calculated total</p>
+      <p class="mwp-title" style="font-size:20px; margin:0 0 6px; color:#FFFFFF;">${t.calories} cal</p>
+      <div style="display:flex; gap:12px; font-size:10.5px; color:#EAE6E1;" class="mwp-body">
+        <span>${t.protein}g protein</span><span>${t.carbs}g carbs</span><span>${t.fat}g fat</span>
+      </div>
+    </div>
+
+    <p id="saveError" class="mwp-error" style="display:none;"></p>
+    <button id="saveBtn" class="mwp-btn" ${items.length === 0 ? 'disabled' : ''}>Save Entry</button>
+  `;
+
+  document.getElementById('photoInput').addEventListener('change', (e) => {
+    photoFile = e.target.files[0] || null;
+    render();
+  });
+  document.getElementById('addItemBtn').addEventListener('click', addItem);
+  document.querySelectorAll('[data-remove]').forEach((el) => {
+    el.addEventListener('click', () => {
+      items.splice(Number(el.dataset.remove), 1);
+      render();
+    });
+  });
+  document.getElementById('saveBtn').addEventListener('click', saveEntry);
+}
+
+function addItem() {
+  const name = document.getElementById('itemName').value.trim();
+  const amount = parseFloat(document.getElementById('itemAmount').value) || 0;
+  const unit = document.getElementById('itemUnit').value;
+  const calories = parseInt(document.getElementById('itemCalories').value) || 0;
+  const protein = parseFloat(document.getElementById('itemProtein').value) || 0;
+  const carbs = parseFloat(document.getElementById('itemCarbs').value) || 0;
+  const fat = parseFloat(document.getElementById('itemFat').value) || 0;
+  if (!name) return;
+  items.push({ name, amount, unit, calories, protein, carbs, fat });
+  render();
+}
+
+async function saveEntry() {
+  const btn = document.getElementById('saveBtn');
+  const errEl = document.getElementById('saveError');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+
+  let photoPath = null;
+  if (photoFile) {
+    photoPath = `${userId}/meals/${Date.now()}-${photoFile.name}`;
+    const { error: uploadError } = await sb.storage.from('photos').upload(photoPath, photoFile);
+    if (uploadError) {
+      errEl.textContent = uploadError.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      return;
+    }
+  }
+
+  const t = totals();
+  const { data: mealLog, error } = await sb.from('meal_logs').insert({
+    user_id: userId,
+    meal_type: mealType,
+    photo_path: photoPath,
+    total_calories: t.calories,
+    protein_g: t.protein,
+    carbs_g: t.carbs,
+    fat_g: t.fat,
+  }).select().single();
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    return;
+  }
+
+  const { error: itemsError } = await sb.from('meal_log_items').insert(
+    items.map((i) => ({
+      meal_log_id: mealLog.id,
+      food_name: i.name,
+      amount: i.amount,
+      unit: i.unit,
+      calories: i.calories,
+    }))
+  );
+
+  if (itemsError) {
+    errEl.textContent = itemsError.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    return;
+  }
+
+  window.location.href = 'nutrition.html';
+}
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  userId = session.user.id;
+  render();
+})();
+</script>
+</body>
+</html>

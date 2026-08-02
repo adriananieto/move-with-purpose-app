@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Move With Purpose · Profile</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+let userId;
+
+function initials(name) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+
+function weeksSince(dateStr) {
+  const ms = Date.now() - new Date(dateStr).getTime();
+  return Math.max(1, Math.floor(ms / (7 * 24 * 60 * 60 * 1000)));
+}
+
+function weightChart(logs) {
+  if (logs.length < 2) {
+    return '<p class="mwp-body" style="font-size:11px; color:#8F867E; opacity:0.7; text-align:center; padding:20px 0;">Log your weight during a check-in to see your progress here.</p>';
+  }
+  const values = logs.map((l) => Number(l.weight_lb));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = 260 / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = 10 + i * stepX;
+    const y = 20 + (1 - (v - min) / range) * 50;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const last = points.split(' ').slice(-1)[0].split(',');
+  return `
+    <svg viewBox="0 0 280 90" style="width:100%; height:90px;">
+      <polyline points="${points}" fill="none" stroke="#8F867E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="#8F867E"/>
+    </svg>
+    <div style="display:flex; justify-content:space-between; font-size:10px; color:#8F867E; margin-top:4px;" class="mwp-body">
+      <span>${logs[0].logged_at}</span><span>${logs[logs.length - 1].logged_at}</span>
+    </div>`;
+}
+
+function photoTile(photo) {
+  const url = sb.storage.from('photos').getPublicUrl(photo.storage_path).data.publicUrl;
+  return `<div style="aspect-ratio:3/4; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; overflow:hidden;"><img src="${url}" alt="Progress photo" style="width:100%; height:100%; object-fit:cover;" /></div>`;
+}
+
+async function loadAndRender() {
+  const [profileRes, weightRes, photosRes] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', userId).single(),
+    sb.from('body_weight_logs').select('*').eq('user_id', userId).order('logged_at', { ascending: true }),
+    sb.from('progress_photos').select('*').eq('user_id', userId).order('taken_at', { ascending: false }).limit(2),
+  ]);
+
+  const profile = profileRes.data;
+  const weightLogs = weightRes.data || [];
+  const photos = photosRes.data || [];
+
+  const current = weightLogs.length ? Number(weightLogs[weightLogs.length - 1].weight_lb) : null;
+  const first = weightLogs.length ? Number(weightLogs[0].weight_lb) : null;
+  const change = current !== null && first !== null ? (current - first).toFixed(1) : null;
+  const memberSince = new Date(profile.member_since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  document.getElementById('card').innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:1.2rem;">
+      <div style="width:50px; height:50px; border-radius:50%; background:#8F867E; display:flex; align-items:center; justify-content:center;">
+        <span class="mwp-title" style="font-size:15px; color:#FFFFFF;">${initials(profile.full_name)}</span>
+      </div>
+      <div style="flex:1;">
+        <p class="mwp-title" style="font-size:15px; margin:0; color:#8F867E; text-transform:uppercase;">${profile.full_name}</p>
+        <p class="mwp-body" style="font-size:10.5px; color:#8F867E; margin:0; opacity:0.75;">Member since ${memberSince}</p>
+      </div>
+      <span class="mwp-body" style="font-size:9px; font-weight:600; letter-spacing:0.5px; background:#8F867E; color:#FFFFFF; padding:5px 10px; border-radius:6px; text-transform:uppercase;">${profile.plan_tier}</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:1.2rem;">
+      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; text-align:center;">
+        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${current !== null ? current + ' lb' : '—'}</p>
+        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Current</p>
+      </div>
+      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; text-align:center;">
+        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${change !== null ? (change > 0 ? '+' : '') + change + ' lb' : '—'}</p>
+        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Since start</p>
+      </div>
+      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; text-align:center;">
+        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${weeksSince(profile.member_since)}</p>
+        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Weeks</p>
+      </div>
+    </div>
+
+    <p class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">Body Weight</p>
+    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:14px; margin-bottom:1.2rem;">
+      ${weightChart(weightLogs)}
+    </div>
+
+    <p class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">Progress Photos</p>
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:0.5rem;">
+      ${photos.map(photoTile).join('')}
+      <label for="photoInput" style="cursor:pointer; aspect-ratio:3/4; background:#8F867E; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-plus" style="font-size:17px; color:#FFFFFF;" aria-hidden="true"></i></label>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" style="display:none;" />
+    <p id="photoError" class="mwp-error" style="display:none;"></p>
+
+    <div data-bottom-nav></div>
+  `;
+
+  renderBottomNav('profile');
+
+  document.getElementById('photoInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const errEl = document.getElementById('photoError');
+    errEl.style.display = 'none';
+    const path = `${userId}/progress/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await sb.storage.from('photos').upload(path, file);
+    if (uploadError) {
+      errEl.textContent = uploadError.message;
+      errEl.style.display = 'block';
+      return;
+    }
+    await sb.from('progress_photos').insert({ user_id: userId, storage_path: path });
+    await loadAndRender();
+  });
+}
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  userId = session.user.id;
+  await loadAndRender();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Move With Purpose · Home</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  const userId = session.user.id;
+  const card = document.getElementById('card');
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // 0 = Monday
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day);
+  monday.setHours(0, 0, 0, 0);
+  const todayStr = now.toISOString().slice(0, 10);
+  const mondayStr = monday.toISOString().slice(0, 10);
+
+  const [profileRes, programRes, exerciseLogsRes, nutritionTargetRes, mealLogsRes] = await Promise.all([
+    sb.from('profiles').select('full_name').eq('id', userId).single(),
+    sb.from('programs').select('id, name, exercises(id)').limit(1).single(),
+    sb.from('exercise_logs').select('logged_at').eq('user_id', userId).gte('logged_at', mondayStr),
+    sb.from('nutrition_targets').select('calories').eq('user_id', userId).single(),
+    sb.from('meal_logs').select('total_calories').eq('user_id', userId).eq('logged_at', todayStr),
+  ]);
+
+  const fullName = profileRes.data?.full_name || 'there';
+  const firstName = fullName.split(' ')[0];
+
+  const workoutTarget = 5;
+  const daysTrained = new Set((exerciseLogsRes.data || []).map((l) => l.logged_at.slice(0, 10))).size;
+  const workoutsDone = Math.min(daysTrained, workoutTarget);
+  const weeklyPct = Math.round((workoutsDone / workoutTarget) * 100);
+
+  const programName = programRes.data?.name || 'No program yet';
+  const exerciseCount = programRes.data?.exercises?.length || 0;
+
+  const caloriesTarget = nutritionTargetRes.data?.calories || 1800;
+  const caloriesToday = (mealLogsRes.data || []).reduce((sum, m) => sum + (m.total_calories || 0), 0);
+
+  card.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 1.5rem;">
+      <div>
+        <p class="mwp-body" style="font-size:10px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">${greeting}</p>
+        <p class="mwp-title" style="font-size:24px; margin:0; color:#8F867E; text-transform:uppercase; letter-spacing:0.5px;">${firstName}</p>
+      </div>
+      <button id="logoutBtn" style="width:34px; height:34px; border-radius:50%; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;"><i class="ti ti-logout" style="font-size:16px; color:#8F867E;" aria-hidden="true"></i></button>
+    </div>
+
+    <div style="background:#8F867E; border-radius:12px; padding:1.15rem 1.1rem; margin-bottom:0.9rem;">
+      <p class="mwp-body" style="font-size:9px; font-weight:500; letter-spacing:1.5px; color:#EAE6E1; margin:0 0 6px; text-transform:uppercase;">Weekly Progress</p>
+      <div style="display:flex; align-items:baseline; justify-content:space-between;">
+        <p class="mwp-title" style="font-size:30px; margin:0; color:#FFFFFF;">${weeklyPct}%</p>
+        <p class="mwp-body" style="font-size:10px; font-weight:500; color:#EAE6E1; margin:0; text-transform:uppercase; letter-spacing:0.5px;">${workoutsDone} / ${workoutTarget} workouts</p>
+      </div>
+      <div style="height:3px; background:rgba(255,255,255,0.25); border-radius:2px; margin-top:8px; overflow:hidden;">
+        <div style="width:${weeklyPct}%; height:100%; background:#FFFFFF;"></div>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:1.1rem;">
+      <a href="workout.html" style="text-decoration:none; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:12px; display:block;">
+        <i class="ti ti-barbell" style="font-size:18px; color:#8F867E;" aria-hidden="true"></i>
+        <p class="mwp-title" style="font-size:12px; margin:9px 0 3px; color:#8F867E; text-transform:uppercase; letter-spacing:0.3px;">Training</p>
+        <p class="mwp-body" style="font-size:11px; color:#8F867E; margin:0;">${programName} · ${exerciseCount} exercises</p>
+      </a>
+      <a href="nutrition.html" style="text-decoration:none; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:12px; display:block;">
+        <i class="ti ti-apple" style="font-size:18px; color:#8F867E;" aria-hidden="true"></i>
+        <p class="mwp-title" style="font-size:12px; margin:9px 0 3px; color:#8F867E; text-transform:uppercase; letter-spacing:0.3px;">Nutrition</p>
+        <p class="mwp-body" style="font-size:11px; color:#8F867E; margin:0;">${caloriesToday} / ${caloriesTarget} kcal</p>
+      </a>
+    </div>
+
+    <a href="checkin.html" style="text-decoration:none; display:block; text-align:center; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; margin-bottom:1.1rem;">
+      <span class="mwp-title" style="font-size:11px; color:#8F867E; text-transform:uppercase; letter-spacing:0.5px;">Submit weekly check-in</span>
+    </a>
+
+    <p class="mwp-body" style="font-size:8.5px; font-weight:500; letter-spacing:1.2px; color:#8F867E; margin:0 0 1rem; text-align:center; text-transform:uppercase;">Move With Intention · Train With Discipline</p>
+
+    <div data-bottom-nav></div>
+  `;
+
+  renderBottomNav('home');
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+})();
+</script>
+</body>
+</html>

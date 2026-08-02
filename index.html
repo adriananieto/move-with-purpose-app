@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Move With Purpose</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<div class="mwp-card">
+  <div style="text-align:center; margin-bottom:1.5rem;">
+    <p class="mwp-body" style="font-size:9px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Welcome to</p>
+    <p class="mwp-title" style="font-size:26px; margin:0; color:#8F867E; text-transform:uppercase;">Move With Purpose</p>
+  </div>
+
+  <div style="display:flex; gap:6px; margin-bottom:1.2rem;">
+    <button id="tabLogin" class="mwp-body" style="flex:1; padding:8px; border-radius:8px; border:none; background:#8F867E; color:#FFFFFF; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer;">Log in</button>
+    <button id="tabSignup" class="mwp-body" style="flex:1; padding:8px; border-radius:8px; border:none; background:#FFFFFF; color:#8F867E; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer;">Sign up</button>
+  </div>
+
+  <p id="formError" class="mwp-error" style="display:none;"></p>
+  <p id="formNotice" class="mwp-body" style="color:#8F867E; font-size:11.5px; margin:0 0 10px; display:none;"></p>
+
+  <form id="authForm">
+    <div id="nameField" style="margin-bottom:8px; display:none;">
+      <input class="mwp-input" type="text" id="fullName" placeholder="Full name" />
+    </div>
+    <div style="margin-bottom:8px;">
+      <input class="mwp-input" type="email" id="email" placeholder="Email" required />
+    </div>
+    <div style="margin-bottom:14px;">
+      <input class="mwp-input" type="password" id="password" placeholder="Password" required minlength="6" />
+    </div>
+    <button type="submit" id="submitBtn" class="mwp-btn">Log in</button>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script>
+let mode = 'login';
+const tabLogin = document.getElementById('tabLogin');
+const tabSignup = document.getElementById('tabSignup');
+const nameField = document.getElementById('nameField');
+const submitBtn = document.getElementById('submitBtn');
+const formError = document.getElementById('formError');
+const formNotice = document.getElementById('formNotice');
+
+function setMode(next) {
+  mode = next;
+  const isLogin = mode === 'login';
+  tabLogin.style.background = isLogin ? '#8F867E' : '#FFFFFF';
+  tabLogin.style.color = isLogin ? '#FFFFFF' : '#8F867E';
+  tabSignup.style.background = isLogin ? '#FFFFFF' : '#8F867E';
+  tabSignup.style.color = isLogin ? '#8F867E' : '#FFFFFF';
+  nameField.style.display = isLogin ? 'none' : 'block';
+  submitBtn.textContent = isLogin ? 'Log in' : 'Sign up';
+  formError.style.display = 'none';
+  formNotice.style.display = 'none';
+}
+
+tabLogin.addEventListener('click', () => setMode('login'));
+tabSignup.addEventListener('click', () => setMode('signup'));
+
+document.getElementById('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  formError.style.display = 'none';
+  formNotice.style.display = 'none';
+  submitBtn.disabled = true;
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  try {
+    if (mode === 'login') {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      window.location.href = 'home.html';
+    } else {
+      const fullName = document.getElementById('fullName').value.trim();
+      const { data, error } = await sb.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName || 'New Member' } },
+      });
+      if (error) throw error;
+      if (data.session) {
+        window.location.href = 'home.html';
+      } else {
+        setMode('login');
+        formNotice.textContent = 'Cuenta creada. Revisa tu correo para confirmar antes de iniciar sesión.';
+        formNotice.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    formError.textContent = err.message || 'Algo salió mal. Intenta de nuevo.';
+    formError.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) window.location.href = 'home.html';
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Move With Purpose · Check-in</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css" />
+<style>
+.scale-btn { flex:1; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.08); border-radius:6px; padding:7px 0; font-size:11px; font-family:'Work Sans',sans-serif; color:#8F867E; text-align:center; cursor:pointer; }
+.scale-btn.active { background:#8F867E; color:#FFFFFF; border-color:#8F867E; }
+</style>
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script>
+let userId, weekNumber;
+const state = { hunger: null, energy: null, adherence: null, stress: null, weight: '', feedback: '' };
+const photoFiles = [null, null, null];
+
+function scaleRow(field, label) {
+  const btns = [1, 2, 3, 4, 5].map((n) =>
+    `<div class="scale-btn ${state[field] === n ? 'active' : ''}" data-field="${field}" data-value="${n}">${n}</div>`
+  ).join('');
+  return `
+    <p class="mwp-body" style="font-size:9.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">${label}</p>
+    <div style="display:flex; gap:5px; margin-bottom:0.85rem;">${btns}</div>`;
+}
+
+function render() {
+  document.getElementById('card').innerHTML = `
+    <p class="mwp-body" style="font-size:10px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Week ${weekNumber}</p>
+    <p class="mwp-title" style="font-size:20px; margin:0 0 1.1rem; color:#8F867E; text-transform:uppercase;">Weekly Check-in</p>
+
+    <p class="mwp-body" style="font-size:9.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">Fasting weight</p>
+    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:0 12px; display:flex; align-items:center; gap:8px; margin-bottom:0.9rem; height:40px;">
+      <input type="number" id="weightInput" value="${state.weight}" style="flex:1; border:none; font-size:14px; font-weight:600; color:#8F867E;" aria-label="Fasting weight" />
+      <span class="mwp-body" style="font-size:11px; color:#8F867E;">lb</span>
+    </div>
+
+    <p class="mwp-body" style="font-size:9.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">Photos</p>
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:7px; margin-bottom:0.9rem;">
+      ${[0, 1, 2].map((i) => `
+        <label for="photo${i}" style="cursor:pointer; aspect-ratio:3/4; background:#FFFFFF; border:1.5px dashed #C4BEB4; border-radius:9px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          ${photoFiles[i] ? `<span class="mwp-body" style="font-size:9px; color:#8F867E; padding:4px; text-align:center;">${photoFiles[i].name}</span>` : '<i class="ti ti-camera" style="font-size:14px; color:#C4BEB4;" aria-hidden="true"></i>'}
+        </label>
+        <input type="file" id="photo${i}" accept="image/*" style="display:none;" />
+      `).join('')}
+    </div>
+
+    ${scaleRow('hunger', 'Hunger level')}
+    ${scaleRow('energy', 'Energy level')}
+    ${scaleRow('adherence', 'Plan adherence')}
+    ${scaleRow('stress', 'Stress / sleep quality')}
+
+    <p class="mwp-body" style="font-size:9.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">General feedback</p>
+    <textarea id="feedbackInput" placeholder="Cómo te sentiste esta semana, dudas, ajustes..." class="mwp-textarea" style="height:60px; margin-bottom:1.2rem;">${state.feedback}</textarea>
+
+    <p id="submitError" class="mwp-error" style="display:none;"></p>
+    <button id="submitBtn" class="mwp-btn">Submit Check-in</button>
+  `;
+
+  document.querySelectorAll('.scale-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state[btn.dataset.field] = Number(btn.dataset.value);
+      render();
+    });
+  });
+
+  [0, 1, 2].forEach((i) => {
+    document.getElementById(`photo${i}`).addEventListener('change', (e) => {
+      photoFiles[i] = e.target.files[0] || null;
+      render();
+    });
+  });
+
+  document.getElementById('weightInput').addEventListener('input', (e) => {
+    state.weight = e.target.value;
+  });
+
+  document.getElementById('feedbackInput').addEventListener('input', (e) => {
+    state.feedback = e.target.value;
+  });
+
+  document.getElementById('submitBtn').addEventListener('click', submit);
+}
+
+async function submit() {
+  const btn = document.getElementById('submitBtn');
+  const errEl = document.getElementById('submitError');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+
+  const weight = parseFloat(document.getElementById('weightInput').value);
+  if (isNaN(weight)) {
+    errEl.textContent = 'Ingresa tu peso en ayunas.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    return;
+  }
+
+  const { error } = await sb.from('checkins').insert({
+    user_id: userId,
+    week_number: weekNumber,
+    fasting_weight_lb: weight,
+    hunger_level: state.hunger,
+    energy_level: state.energy,
+    adherence_level: state.adherence,
+    stress_level: state.stress,
+    feedback_text: document.getElementById('feedbackInput').value.trim(),
+  });
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    return;
+  }
+
+  await sb.from('body_weight_logs').insert({ user_id: userId, weight_lb: weight });
+
+  for (let i = 0; i < photoFiles.length; i++) {
+    const file = photoFiles[i];
+    if (!file) continue;
+    const path = `${userId}/checkins/week${weekNumber}-${i}-${file.name}`;
+    const { error: uploadError } = await sb.storage.from('photos').upload(path, file);
+    if (!uploadError) {
+      await sb.from('progress_photos').insert({ user_id: userId, storage_path: path });
+    }
+  }
+
+  window.location.href = 'home.html';
+}
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  userId = session.user.id;
+
+  const { data: profile } = await sb.from('profiles').select('member_since').eq('id', userId).single();
+  const ms = Date.now() - new Date(profile.member_since).getTime();
+  weekNumber = Math.max(1, Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1);
+
+  render();
+})();
+</script>
+</body>
+</html>

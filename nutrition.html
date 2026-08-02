@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Move With Purpose · Nutrition</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+const MEAL_ICONS = { breakfast: 'ti-sun', lunch: 'ti-sun-high', dinner: 'ti-moon' };
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+const MEAL_ORDER = ['breakfast', 'lunch', 'dinner'];
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  const userId = session.user.id;
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const [targetRes, plansRes, logsRes] = await Promise.all([
+    sb.from('nutrition_targets').select('*').eq('user_id', userId).single(),
+    sb.from('meal_plan_items').select('*').eq('user_id', userId),
+    sb.from('meal_logs').select('*').eq('user_id', userId).eq('logged_at', todayStr),
+  ]);
+
+  const target = targetRes.data || { calories: 1800, protein_g: 130, carbs_g: 180, fat_g: 60 };
+  const plans = plansRes.data || [];
+  const logs = logsRes.data || [];
+
+  const totals = logs.reduce((acc, l) => ({
+    calories: acc.calories + (l.total_calories || 0),
+    protein_g: acc.protein_g + Number(l.protein_g || 0),
+    carbs_g: acc.carbs_g + Number(l.carbs_g || 0),
+    fat_g: acc.fat_g + Number(l.fat_g || 0),
+  }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
+
+  const loggedMealTypes = new Set(logs.map((l) => l.meal_type));
+
+  const circumference = 188;
+  const calPct = Math.min(totals.calories / target.calories, 1);
+  const dashOffset = Math.round(circumference * (1 - calPct));
+
+  function bar(label, value, max) {
+    const pct = Math.min(Math.round((value / max) * 100), 100);
+    return `
+      <div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; color:#8F867E;" class="mwp-body"><span>${label}</span><span>${Math.round(value)}/${max}g</span></div>
+        <div style="height:4px; background:rgba(0,0,0,0.08); border-radius:2px;"><div style="width:${pct}%; height:100%; background:#8F867E; border-radius:2px;"></div></div>
+      </div>`;
+  }
+
+  function mealRow(type) {
+    const plan = plans.find((p) => p.meal_type === type);
+    const done = loggedMealTypes.has(type);
+    return `
+      <a href="log-meal.html?type=${type}" style="text-decoration:none; display:flex; align-items:center; gap:10px; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:10px 12px;">
+        <i class="ti ${MEAL_ICONS[type]}" style="font-size:16px; color:#8F867E;" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <p class="mwp-title" style="font-size:11px; margin:0; color:#8F867E; text-transform:uppercase;">${MEAL_LABELS[type]}</p>
+          <p class="mwp-body" style="font-size:10.5px; color:#8F867E; margin:0; opacity:0.75;">${plan ? plan.description : 'No plan set'}</p>
+        </div>
+        ${done
+          ? '<i class="ti ti-check" style="font-size:15px; color:#8F867E;" aria-hidden="true"></i>'
+          : '<div style="width:14px; height:14px; border-radius:50%; border:1.5px solid #C4BEB4;"></div>'}
+      </a>`;
+  }
+
+  document.getElementById('card').innerHTML = `
+    <p class="mwp-body" style="font-size:10px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Today</p>
+    <p class="mwp-title" style="font-size:22px; margin:0 0 1.2rem; color:#8F867E; text-transform:uppercase;">Nutrition</p>
+
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.2rem;">
+      <div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+        <svg viewBox="0 0 72 72" style="width:72px; height:72px; transform:rotate(-90deg);">
+          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="6"/>
+          <circle cx="36" cy="36" r="30" fill="none" stroke="#8F867E" stroke-width="6" stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <span class="mwp-title" style="font-size:13px; color:#8F867E;">${totals.calories}</span>
+          <span class="mwp-body" style="font-size:8px; color:#8F867E;">/ ${target.calories}</span>
+        </div>
+      </div>
+      <div style="flex:1; display:flex; flex-direction:column; gap:7px;">
+        ${bar('Protein', totals.protein_g, target.protein_g)}
+        ${bar('Carbs', totals.carbs_g, target.carbs_g)}
+        ${bar('Fat', totals.fat_g, target.fat_g)}
+      </div>
+    </div>
+
+    <p class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">Meal Plan</p>
+    <div style="display:flex; flex-direction:column; gap:7px;">
+      ${MEAL_ORDER.map(mealRow).join('')}
+    </div>
+
+    <div data-bottom-nav></div>
+  `;
+
+  renderBottomNav('nutrition');
+})();
+</script>
+</body>
+</html>
