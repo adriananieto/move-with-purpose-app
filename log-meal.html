@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Move With Purpose" />
 <title>Move With Purpose · Log Meal</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=2" />
+<link rel="stylesheet" href="css/app.css?v=3" />
 </head>
 <body>
 
@@ -19,14 +19,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/nutritionApi.js"></script>
 <script>
-const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Morning Snack', lunch: 'Lunch', snack_pm: 'Afternoon Snack', dinner: 'Dinner' };
 const params = new URLSearchParams(window.location.search);
 const mealType = MEAL_LABELS[params.get('type')] ? params.get('type') : 'lunch';
 
 let userId;
 let items = [];
 let photoFile = null;
+let manualMode = false;
+let searchResults = [];
+let selectedFood = null;
+let searchTimer = null;
 
 function totals() {
   return items.reduce((acc, i) => ({
@@ -40,51 +45,37 @@ function totals() {
 function render() {
   const t = totals();
   document.getElementById('card').innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.1rem;">
-      <a href="nutrition.html" style="line-height:0;"><i class="ti ti-x" style="font-size:17px; color:#8F867E;" aria-hidden="true"></i></a>
-      <p class="mwp-title" style="font-size:15px; margin:0; color:#8F867E; text-transform:uppercase;">Log Food · ${MEAL_LABELS[mealType]}</p>
-      <span style="width:17px;"></span>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem;">
+      <a href="nutrition.html" style="line-height:0;"><i class="ti ti-x" style="font-size:19px; color:#8F867E;" aria-hidden="true"></i></a>
+      <p class="mwp-title" style="font-size:17px; margin:0; color:#8F867E; text-transform:uppercase;">Log Food · ${MEAL_LABELS[mealType]}</p>
+      <span style="width:19px;"></span>
     </div>
 
-    <label for="photoInput" style="cursor:pointer; background:#FFFFFF; border:1.5px dashed #C4BEB4; border-radius:12px; aspect-ratio:16/9; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:8px;">
-      <i class="ti ti-camera" style="font-size:18px; color:#C4BEB4;" aria-hidden="true"></i>
-      <p class="mwp-body" style="font-size:11px; color:#C4BEB4; margin:0;">${photoFile ? photoFile.name : 'Add a photo'}</p>
+    <label for="photoInput" style="cursor:pointer; background:#FFFFFF; border:1.5px dashed #C4BEB4; border-radius:12px; aspect-ratio:16/9; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <i class="ti ti-camera" style="font-size:20px; color:#C4BEB4;" aria-hidden="true"></i>
+      <p class="mwp-body" style="font-size:12px; color:#C4BEB4; margin:0;">${photoFile ? photoFile.name : 'Add a photo'}</p>
     </label>
     <input type="file" id="photoInput" accept="image/*" style="display:none;" />
 
-    <p class="mwp-body" style="font-size:9.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">Add each item</p>
-    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
-      <input type="text" id="itemName" placeholder="Search food, e.g. chicken breast" class="mwp-input" />
-      <div style="display:flex; gap:6px;">
-        <input type="number" id="itemAmount" placeholder="Amount" class="mwp-input" style="flex:1;" />
-        <select id="itemUnit" class="mwp-select" style="width:68px;">
-          <option>oz</option><option>g</option><option>cup</option>
-        </select>
-      </div>
-      <div style="display:flex; gap:6px;">
-        <input type="number" id="itemCalories" placeholder="Calories" class="mwp-input" style="flex:1;" />
-        <input type="number" id="itemProtein" placeholder="Protein g" class="mwp-input" style="flex:1;" />
-        <input type="number" id="itemCarbs" placeholder="Carbs g" class="mwp-input" style="flex:1;" />
-        <input type="number" id="itemFat" placeholder="Fat g" class="mwp-input" style="flex:1;" />
-      </div>
-      <button id="addItemBtn" class="mwp-body" style="align-self:flex-end; width:34px; height:34px; border-radius:50%; border:none; background:#8F867E; color:#FFFFFF; font-size:16px;" aria-label="Add item">+</button>
-    </div>
+    ${manualMode ? renderManualEntry() : renderFoodSearch()}
+
+    <button id="modeToggle" class="mwp-btn-link" style="margin-bottom:14px; display:block;">${manualMode ? 'Search food database instead' : "Can't find it? Enter manually"}</button>
 
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
       ${items.map((item, idx) => `
-        <div style="display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:9px; padding:9px 12px;">
-          <span class="mwp-body" style="font-size:11.5px; color:#8F867E;">${item.name} · ${item.amount}${item.unit}</span>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="mwp-body" style="font-size:10.5px; color:#8F867E; opacity:0.65;">${item.calories} cal</span>
-            <i class="ti ti-x" data-remove="${idx}" style="font-size:12px; color:#C4BEB4; cursor:pointer;" aria-hidden="true"></i>
+        <div style="display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:11px 13px;">
+          <span class="mwp-body" style="font-size:13px; color:#8F867E;">${item.name} · ${item.amount}${item.unit}</span>
+          <div style="display:flex; align-items:center; gap:9px;">
+            <span class="mwp-body" style="font-size:11.5px; color:#8F867E; opacity:0.65;">${item.calories} cal</span>
+            <i class="ti ti-x" data-remove="${idx}" style="font-size:13px; color:#C4BEB4; cursor:pointer;" aria-hidden="true"></i>
           </div>
         </div>`).join('')}
     </div>
 
-    <div style="background:#8F867E; border-radius:11px; padding:12px; margin-bottom:1.15rem;">
-      <p class="mwp-body" style="font-size:9px; letter-spacing:0.5px; color:#EAE6E1; margin:0 0 6px; text-transform:uppercase;">Auto-calculated total</p>
-      <p class="mwp-title" style="font-size:20px; margin:0 0 6px; color:#FFFFFF;">${t.calories} cal</p>
-      <div style="display:flex; gap:12px; font-size:10.5px; color:#EAE6E1;" class="mwp-body">
+    <div style="background:#8F867E; border-radius:12px; padding:14px; margin-bottom:1.2rem;">
+      <p class="mwp-body" style="font-size:10px; letter-spacing:0.5px; color:#EAE6E1; margin:0 0 6px; text-transform:uppercase;">Auto-calculated total</p>
+      <p class="mwp-title" style="font-size:22px; margin:0 0 6px; color:#FFFFFF;">${t.calories} cal</p>
+      <div style="display:flex; gap:12px; font-size:11.5px; color:#EAE6E1;" class="mwp-body">
         <span>${t.protein}g protein</span><span>${t.carbs}g carbs</span><span>${t.fat}g fat</span>
       </div>
     </div>
@@ -93,21 +84,132 @@ function render() {
     <button id="saveBtn" class="mwp-btn" ${items.length === 0 ? 'disabled' : ''}>Save Entry</button>
   `;
 
+  attachHandlers();
+}
+
+function renderFoodSearch() {
+  return `
+    <p class="mwp-body" style="font-size:10.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Search food</p>
+    <div style="position:relative; margin-bottom:${selectedFood ? '10px' : '14px'};">
+      <input type="text" id="foodSearch" placeholder="e.g. chicken breast" class="mwp-input" autocomplete="off" />
+      ${searchResults.length ? `
+        <div style="position:absolute; top:100%; left:0; right:0; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.1); border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto; z-index:10;">
+          ${searchResults.map((f, idx) => `
+            <div data-select="${idx}" style="padding:10px 12px; font-size:12.5px; color:#8F867E; cursor:pointer; border-bottom:0.5px solid rgba(0,0,0,0.05);" class="mwp-body">
+              ${f.description}${f.brandName ? ` <span style="opacity:0.6;">(${f.brandName})</span>` : ''}
+            </div>`).join('')}
+        </div>` : ''}
+    </div>
+
+    ${selectedFood ? `
+      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:12px; margin-bottom:14px;">
+        <p class="mwp-title" style="font-size:12.5px; margin:0 0 8px; color:#8F867E; text-transform:uppercase;">${selectedFood.description}</p>
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+          <input type="number" id="amountGrams" value="100" class="mwp-input" style="flex:1;" />
+          <span class="mwp-body" style="font-size:12px; color:#8F867E;">grams</span>
+        </div>
+        <p class="mwp-body" style="font-size:11.5px; color:#8F867E; opacity:0.75; margin:0 0 10px;" id="livePreview"></p>
+        <button id="addSelectedBtn" class="mwp-btn" style="padding:10px;">Add to meal</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+function renderManualEntry() {
+  return `
+    <p class="mwp-body" style="font-size:10.5px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Add manually</p>
+    <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:14px;">
+      <input type="text" id="itemName" placeholder="Food name" class="mwp-input" />
+      <div style="display:flex; gap:6px;">
+        <input type="number" id="itemAmount" placeholder="Amount" class="mwp-input" style="flex:1;" />
+        <select id="itemUnit" class="mwp-select" style="width:74px;">
+          <option>g</option><option>oz</option><option>cup</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input type="number" id="itemCalories" placeholder="Calories" class="mwp-input" style="flex:1;" />
+        <input type="number" id="itemProtein" placeholder="Protein g" class="mwp-input" style="flex:1;" />
+        <input type="number" id="itemCarbs" placeholder="Carbs g" class="mwp-input" style="flex:1;" />
+        <input type="number" id="itemFat" placeholder="Fat g" class="mwp-input" style="flex:1;" />
+      </div>
+      <button id="addManualBtn" class="mwp-btn" style="padding:10px;">Add item</button>
+    </div>
+  `;
+}
+
+function attachHandlers() {
   document.getElementById('photoInput').addEventListener('change', (e) => {
     photoFile = e.target.files[0] || null;
     render();
   });
-  document.getElementById('addItemBtn').addEventListener('click', addItem);
+
+  document.getElementById('modeToggle').addEventListener('click', () => {
+    manualMode = !manualMode;
+    searchResults = [];
+    selectedFood = null;
+    render();
+  });
+
   document.querySelectorAll('[data-remove]').forEach((el) => {
     el.addEventListener('click', () => {
       items.splice(Number(el.dataset.remove), 1);
       render();
     });
   });
+
   document.getElementById('saveBtn').addEventListener('click', saveEntry);
+
+  if (manualMode) {
+    document.getElementById('addManualBtn').addEventListener('click', addManualItem);
+  } else {
+    const searchInput = document.getElementById('foodSearch');
+    searchInput.addEventListener('input', (e) => {
+      const q = e.target.value;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(async () => {
+        try {
+          searchResults = await searchFoods(q);
+        } catch {
+          searchResults = [];
+        }
+        render();
+        document.getElementById('foodSearch').focus();
+        document.getElementById('foodSearch').setSelectionRange(q.length, q.length);
+      }, 400);
+    });
+
+    document.querySelectorAll('[data-select]').forEach((el) => {
+      el.addEventListener('click', () => {
+        selectedFood = searchResults[Number(el.dataset.select)];
+        searchResults = [];
+        render();
+      });
+    });
+
+    if (selectedFood) {
+      const amountInput = document.getElementById('amountGrams');
+      const updatePreview = () => {
+        const grams = parseFloat(amountInput.value) || 0;
+        const m = scaleMacros(selectedFood.per100g, grams);
+        document.getElementById('livePreview').textContent = `${m.calories} cal · ${m.protein}g protein · ${m.carbs}g carbs · ${m.fat}g fat`;
+      };
+      amountInput.addEventListener('input', updatePreview);
+      updatePreview();
+      document.getElementById('addSelectedBtn').addEventListener('click', addSelectedFood);
+    }
+  }
 }
 
-function addItem() {
+function addSelectedFood() {
+  const grams = parseFloat(document.getElementById('amountGrams').value) || 0;
+  const m = scaleMacros(selectedFood.per100g, grams);
+  items.push({ name: selectedFood.description, amount: grams, unit: 'g', ...m });
+  selectedFood = null;
+  document.getElementById('foodSearch').value = '';
+  render();
+}
+
+function addManualItem() {
   const name = document.getElementById('itemName').value.trim();
   const amount = parseFloat(document.getElementById('itemAmount').value) || 0;
   const unit = document.getElementById('itemUnit').value;
@@ -163,6 +265,9 @@ async function saveEntry() {
       amount: i.amount,
       unit: i.unit,
       calories: i.calories,
+      protein_g: i.protein,
+      carbs_g: i.carbs,
+      fat_g: i.fat,
     }))
   );
 

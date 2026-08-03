@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Move With Purpose" />
 <title>Move With Purpose · Workout</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=2" />
+<link rel="stylesheet" href="css/app.css?v=3" />
 </head>
 <body>
 
@@ -19,142 +19,71 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
 <script>
-let userId, exercises, todayStr, current;
-
-async function loadState() {
-  const todayLogsRes = await sb
-    .from('exercise_logs')
-    .select('exercise_id, set_number, weight_lb')
-    .eq('user_id', userId)
-    .gte('logged_at', todayStr + 'T00:00:00')
-    .order('set_number', { ascending: false });
-
-  const setsLoggedByExercise = {};
-  (todayLogsRes.data || []).forEach((l) => {
-    if (!(l.exercise_id in setsLoggedByExercise) || l.set_number > setsLoggedByExercise[l.exercise_id]) {
-      setsLoggedByExercise[l.exercise_id] = l.set_number;
-    }
-  });
-
-  current = exercises.find((ex) => (setsLoggedByExercise[ex.id] || 0) < ex.target_sets);
-  if (!current) {
-    renderComplete();
-    return;
-  }
-  const setsDone = setsLoggedByExercise[current.id] || 0;
-  current.currentSet = setsDone + 1;
-
-  const lastLogRes = await sb
-    .from('exercise_logs')
-    .select('weight_lb, logged_at')
-    .eq('user_id', userId)
-    .eq('exercise_id', current.id)
-    .lt('logged_at', todayStr + 'T00:00:00')
-    .order('logged_at', { ascending: false })
-    .limit(1);
-  current.lastWeight = lastLogRes.data?.[0]?.weight_lb ?? null;
-
-  render();
-}
-
-function render() {
-  const idx = exercises.findIndex((e) => e.id === current.id);
-  const pct = Math.round(((idx) / exercises.length) * 100);
-  const card = document.getElementById('card');
-  card.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.2rem;">
-      <a href="home.html" style="line-height:0;"><i class="ti ti-chevron-left" style="font-size:18px; color:#8F867E;" aria-hidden="true"></i></a>
-      <p class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:1px; color:#8F867E; margin:0; text-transform:uppercase;">Lower Body</p>
-      <p class="mwp-body" style="font-size:10px; font-weight:600; color:#8F867E; margin:0;">${idx + 1}/${exercises.length}</p>
-    </div>
-
-    <div style="height:3px; background:rgba(0,0,0,0.08); border-radius:2px; margin-bottom:1.3rem; overflow:hidden;">
-      <div style="width:${pct}%; height:100%; background:#8F867E;"></div>
-    </div>
-
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; aspect-ratio:4/3; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
-      <i class="ti ti-video" style="font-size:32px; color:#C4BEB4;" aria-hidden="true"></i>
-    </div>
-
-    <p class="mwp-title" style="font-size:20px; margin:0 0 3px; color:#8F867E; text-transform:uppercase; letter-spacing:0.3px;">${current.name}</p>
-    <p class="mwp-body" style="font-size:11px; color:#8F867E; margin:0 0 1.1rem;">Set ${current.currentSet} of ${current.target_sets} · target ${current.target_reps} reps</p>
-
-    <div style="background:#8F867E; border-radius:12px; padding:14px; margin-bottom:12px;">
-      <p class="mwp-body" style="font-size:9px; font-weight:500; letter-spacing:1px; color:#EAE6E1; margin:0 0 8px; text-transform:uppercase;">Weight used</p>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <input type="number" id="weightInput" value="${current.lastWeight ?? ''}" placeholder="0" style="flex:1; text-align:center; font-size:20px; font-weight:700; height:40px; border-radius:8px; border:none;" aria-label="Pounds used" />
-        <span class="mwp-body" style="font-size:12px; color:#FFFFFF;">lb</span>
-      </div>
-    </div>
-
-    <div style="display:flex; align-items:center; gap:6px; margin-bottom:1.1rem; font-size:11px; color:#8F867E;" class="mwp-body">
-      <i class="ti ti-history" style="font-size:14px;" aria-hidden="true"></i>
-      <span>${current.lastWeight !== null ? `Last time: ${current.lastWeight} lb` : 'No previous record'}</span>
-    </div>
-
-    <p id="saveError" class="mwp-error" style="display:none;"></p>
-    <button id="saveBtn" class="mwp-btn">Save Set</button>
-  `;
-
-  document.getElementById('saveBtn').addEventListener('click', saveSet);
-}
-
-function renderComplete() {
-  document.getElementById('card').innerHTML = `
-    <div style="text-align:center; padding: 2rem 0;">
-      <i class="ti ti-circle-check" style="font-size:40px; color:#8F867E;" aria-hidden="true"></i>
-      <p class="mwp-title" style="font-size:18px; margin:1rem 0 6px; color:#8F867E; text-transform:uppercase;">Workout complete</p>
-      <p class="mwp-body" style="font-size:12px; color:#8F867E; margin:0 0 1.2rem;">Great work today. See you tomorrow.</p>
-      <a href="home.html" class="mwp-btn" style="display:block; text-decoration:none; box-sizing:border-box;">Back to home</a>
-    </div>
-  `;
-}
-
-async function saveSet() {
-  const btn = document.getElementById('saveBtn');
-  const errEl = document.getElementById('saveError');
-  errEl.style.display = 'none';
-  btn.disabled = true;
-  const weight = parseFloat(document.getElementById('weightInput').value);
-
-  const { error } = await sb.from('exercise_logs').insert({
-    user_id: userId,
-    exercise_id: current.id,
-    set_number: current.currentSet,
-    weight_lb: isNaN(weight) ? null : weight,
-    reps: current.target_reps,
-  });
-
-  if (error) {
-    errEl.textContent = error.message;
-    errEl.style.display = 'block';
-    btn.disabled = false;
-    return;
-  }
-
-  await loadState();
-}
-
 (async () => {
   const session = await requireSession();
   if (!session) return;
-  userId = session.user.id;
-  todayStr = new Date().toISOString().slice(0, 10);
+  const userId = session.user.id;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  const { data: program, error } = await sb
-    .from('programs')
-    .select('id, name, exercises(id, name, order_index, target_sets, target_reps)')
-    .limit(1)
-    .single();
+  const { data: days, error } = await sb
+    .from('workout_days')
+    .select('id, day_number, name, workout_sections(id, exercises(id, target_sets))')
+    .order('day_number');
 
-  if (error || !program || !program.exercises?.length) {
-    document.getElementById('card').innerHTML = '<p class="mwp-loading">No hay programa de entrenamiento asignado todavía.</p>';
+  const card = document.getElementById('card');
+
+  if (error || !days || !days.length) {
+    card.innerHTML = '<p class="mwp-loading">No workout program assigned yet.</p>';
     return;
   }
 
-  exercises = program.exercises.sort((a, b) => a.order_index - b.order_index);
-  await loadState();
+  const { data: todayLogs } = await sb
+    .from('exercise_logs')
+    .select('exercise_id, set_number')
+    .eq('user_id', userId)
+    .gte('logged_at', todayStr + 'T00:00:00');
+
+  const setsLoggedByExercise = {};
+  (todayLogs || []).forEach((l) => {
+    setsLoggedByExercise[l.exercise_id] = Math.max(setsLoggedByExercise[l.exercise_id] || 0, l.set_number);
+  });
+
+  function dayStatus(day) {
+    const exercises = day.workout_sections.flatMap((s) => s.exercises);
+    if (!exercises.length) return { done: 0, total: 0 };
+    const total = exercises.length;
+    const done = exercises.filter((e) => (setsLoggedByExercise[e.id] || 0) >= e.target_sets).length;
+    return { done, total };
+  }
+
+  card.innerHTML = `
+    <p class="mwp-body" style="font-size:12px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">This Week</p>
+    <p class="mwp-title" style="font-size:26px; margin:0 0 1.3rem; color:#8F867E; text-transform:uppercase;">Training Split</p>
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      ${days.map((d) => {
+        const { done, total } = dayStatus(d);
+        const complete = total > 0 && done === total;
+        return `
+        <a href="workout-day.html?day=${d.id}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; padding:16px;">
+          <div style="width:42px; height:42px; border-radius:50%; background:${complete ? '#8F867E' : '#EAE6E1'}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <span class="mwp-title" style="font-size:15px; color:${complete ? '#FFFFFF' : '#8F867E'};">${d.day_number}</span>
+          </div>
+          <div style="flex:1;">
+            <p class="mwp-title" style="font-size:15px; margin:0; color:#8F867E; text-transform:uppercase;">Day ${d.day_number} · ${d.name}</p>
+            <p class="mwp-body" style="font-size:12px; color:#8F867E; margin:2px 0 0; opacity:0.7;">${total} exercise${total === 1 ? '' : 's'}${total ? ` · ${done}/${total} done today` : ''}</p>
+          </div>
+          ${complete ? '<i class="ti ti-circle-check" style="font-size:20px; color:#8F867E;" aria-hidden="true"></i>' : '<i class="ti ti-chevron-right" style="font-size:18px; color:#C4BEB4;" aria-hidden="true"></i>'}
+        </a>`;
+      }).join('')}
+    </div>
+
+    <div data-bottom-nav></div>
+  `;
+
+  renderBottomNav('workout');
 })();
 </script>
 </body>

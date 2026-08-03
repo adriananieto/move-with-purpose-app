@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
+<title>Move With Purpose · Workout Day</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css?v=3" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script>
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  const userId = session.user.id;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dayId = new URLSearchParams(window.location.search).get('day');
+  const card = document.getElementById('card');
+
+  const { data: day, error } = await sb
+    .from('workout_days')
+    .select('id, day_number, name, workout_sections(id, name, order_index, exercises(id, name, order_index, target_sets, target_reps))')
+    .eq('id', dayId)
+    .single();
+
+  if (error || !day) {
+    card.innerHTML = '<p class="mwp-loading">Workout day not found.</p>';
+    return;
+  }
+
+  const { data: todayLogs } = await sb
+    .from('exercise_logs')
+    .select('exercise_id, set_number')
+    .eq('user_id', userId)
+    .gte('logged_at', todayStr + 'T00:00:00');
+
+  const setsLoggedByExercise = {};
+  (todayLogs || []).forEach((l) => {
+    setsLoggedByExercise[l.exercise_id] = Math.max(setsLoggedByExercise[l.exercise_id] || 0, l.set_number);
+  });
+
+  const sections = [...day.workout_sections].sort((a, b) => a.order_index - b.order_index);
+
+  function exerciseRow(ex) {
+    const setsDone = setsLoggedByExercise[ex.id] || 0;
+    const complete = setsDone >= ex.target_sets;
+    return `
+      <a href="workout-exercise.html?exercise=${ex.id}&day=${day.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:14px 16px;">
+        <div>
+          <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E; text-transform:uppercase;">${ex.name}</p>
+          <p class="mwp-body" style="font-size:12px; color:#8F867E; margin:2px 0 0; opacity:0.7;">${ex.target_sets} sets × ${ex.target_reps} reps</p>
+        </div>
+        ${complete
+          ? '<i class="ti ti-circle-check" style="font-size:19px; color:#8F867E;" aria-hidden="true"></i>'
+          : `<span class="mwp-body" style="font-size:12px; color:#8F867E; opacity:0.6;">${setsDone}/${ex.target_sets}</span>`}
+      </a>`;
+  }
+
+  card.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:1.2rem;">
+      <a href="workout.html" style="line-height:0;"><i class="ti ti-chevron-left" style="font-size:20px; color:#8F867E;" aria-hidden="true"></i></a>
+      <div>
+        <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 3px; text-transform:uppercase; opacity:0.7;">Day ${day.day_number}</p>
+        <p class="mwp-title" style="font-size:22px; margin:0; color:#8F867E; text-transform:uppercase;">${day.name}</p>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      ${sections.map((sec) => `
+        <div>
+          <p class="mwp-body" style="font-size:12px; font-weight:600; letter-spacing:0.8px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">${sec.name}</p>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${[...sec.exercises].sort((a, b) => a.order_index - b.order_index).map(exerciseRow).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+})();
+</script>
+</body>
+</html>

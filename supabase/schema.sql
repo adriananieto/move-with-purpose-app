@@ -1,6 +1,7 @@
 -- Move With Purpose — database schema
 -- Run this in Supabase: Dashboard → SQL Editor → New query → paste → Run
 -- Safe to re-run: it drops any existing objects first, then recreates everything.
+-- NOTE: re-running this wipes all workout/nutrition/checkin data (fresh start).
 
 -- ============================================================
 -- RESET (drop everything from a previous run, if any)
@@ -18,6 +19,8 @@ drop table if exists public.meal_logs cascade;
 drop table if exists public.checkins cascade;
 drop table if exists public.exercise_logs cascade;
 drop table if exists public.exercises cascade;
+drop table if exists public.workout_sections cascade;
+drop table if exists public.workout_days cascade;
 drop table if exists public.programs cascade;
 drop table if exists public.meal_plan_items cascade;
 drop table if exists public.nutrition_targets cascade;
@@ -44,12 +47,14 @@ create policy "profiles: update own" on public.profiles
   for update using (auth.uid() = id);
 
 -- ============================================================
--- BODY WEIGHT LOGS
+-- BODY WEIGHT + COMPOSITION LOGS
 -- ============================================================
 create table public.body_weight_logs (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete cascade,
   weight_lb numeric not null,
+  body_fat_pct numeric,
+  muscle_mass_pct numeric,
   logged_at date not null default current_date,
   created_at timestamptz not null default now()
 );
@@ -76,16 +81,24 @@ create policy "progress_photos: owner all" on public.progress_photos
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================
--- WORKOUT PROGRAMS + EXERCISES (shared catalog, read-only to clients)
+-- WORKOUT SPLIT: days -> sections -> exercises (shared catalog)
 -- ============================================================
-create table public.programs (
+create table public.workout_days (
   id bigint generated always as identity primary key,
+  day_number int not null,
   name text not null
+);
+
+create table public.workout_sections (
+  id bigint generated always as identity primary key,
+  workout_day_id bigint not null references public.workout_days(id) on delete cascade,
+  name text not null,
+  order_index int not null
 );
 
 create table public.exercises (
   id bigint generated always as identity primary key,
-  program_id bigint not null references public.programs(id) on delete cascade,
+  section_id bigint not null references public.workout_sections(id) on delete cascade,
   name text not null,
   order_index int not null,
   target_sets int not null,
@@ -93,10 +106,13 @@ create table public.exercises (
   video_url text
 );
 
-alter table public.programs enable row level security;
+alter table public.workout_days enable row level security;
+alter table public.workout_sections enable row level security;
 alter table public.exercises enable row level security;
 
-create policy "programs: read all authenticated" on public.programs
+create policy "workout_days: read all authenticated" on public.workout_days
+  for select using (auth.role() = 'authenticated');
+create policy "workout_sections: read all authenticated" on public.workout_sections
   for select using (auth.role() = 'authenticated');
 create policy "exercises: read all authenticated" on public.exercises
   for select using (auth.role() = 'authenticated');
@@ -111,6 +127,7 @@ create table public.exercise_logs (
   set_number int not null,
   weight_lb numeric,
   reps int,
+  notes text,
   logged_at timestamptz not null default now()
 );
 
@@ -136,27 +153,12 @@ create policy "nutrition_targets: owner all" on public.nutrition_targets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================
--- MEAL PLAN (planned meals shown as a checklist)
--- ============================================================
-create table public.meal_plan_items (
-  id bigint generated always as identity primary key,
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  meal_type text not null check (meal_type in ('breakfast','lunch','dinner')),
-  description text not null
-);
-
-alter table public.meal_plan_items enable row level security;
-
-create policy "meal_plan_items: owner all" on public.meal_plan_items
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- ============================================================
 -- MEAL LOGS + ITEMS (actual food logged by the client)
 -- ============================================================
 create table public.meal_logs (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete cascade,
-  meal_type text not null check (meal_type in ('breakfast','lunch','dinner')),
+  meal_type text not null check (meal_type in ('breakfast','snack_am','lunch','snack_pm','dinner')),
   logged_at date not null default current_date,
   photo_path text,
   total_calories int not null default 0,
@@ -172,7 +174,10 @@ create table public.meal_log_items (
   food_name text not null,
   amount numeric,
   unit text,
-  calories int not null default 0
+  calories int not null default 0,
+  protein_g numeric not null default 0,
+  carbs_g numeric not null default 0,
+  fat_g numeric not null default 0
 );
 
 alter table public.meal_logs enable row level security;
@@ -195,6 +200,8 @@ create table public.checkins (
   user_id uuid not null references public.profiles(id) on delete cascade,
   week_number int not null,
   fasting_weight_lb numeric,
+  body_fat_pct numeric,
+  muscle_mass_pct numeric,
   hunger_level int check (hunger_level between 1 and 5),
   energy_level int check (energy_level between 1 and 5),
   adherence_level int check (adherence_level between 1 and 5),
@@ -225,11 +232,6 @@ begin
 
   insert into public.nutrition_targets (user_id) values (new.id);
 
-  insert into public.meal_plan_items (user_id, meal_type, description) values
-    (new.id, 'breakfast', 'Oats, eggs, berries'),
-    (new.id, 'lunch', 'Chicken, rice, veggies'),
-    (new.id, 'dinner', 'Salmon, salad');
-
   return new;
 end;
 $$;
@@ -239,23 +241,85 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ============================================================
--- SEED: default workout program (shared catalog)
+-- SEED: sample 3-day split (replace with the real program later)
 -- ============================================================
-insert into public.programs (name) values ('Lower Body');
+insert into public.workout_days (day_number, name) values
+  (1, 'Lower Body'),
+  (2, 'Upper Body'),
+  (3, 'Conditioning');
 
-insert into public.exercises (program_id, name, order_index, target_sets, target_reps)
-select p.id, e.name, e.order_index, e.target_sets, e.target_reps
-from public.programs p, (values
-  ('Barbell Back Squat', 1, 4, 10),
-  ('Romanian Deadlift', 2, 4, 10),
-  ('Bulgarian Split Squat', 3, 4, 12),
-  ('Walking Lunges', 4, 3, 12),
-  ('Hip Thrust', 5, 4, 12),
-  ('Leg Press', 6, 3, 15),
-  ('Seated Leg Curl', 7, 3, 15),
-  ('Standing Calf Raise', 8, 4, 15)
-) as e(name, order_index, target_sets, target_reps)
-where p.name = 'Lower Body';
+-- Day 1: Lower Body
+insert into public.workout_sections (workout_day_id, name, order_index)
+select d.id, s.name, s.order_index
+from public.workout_days d, (values
+  ('Warm Up', 1),
+  ('Workout', 2),
+  ('Core', 3)
+) as s(name, order_index)
+where d.name = 'Lower Body';
+
+insert into public.exercises (section_id, name, order_index, target_sets, target_reps)
+select sec.id, e.name, e.order_index, e.target_sets, e.target_reps
+from public.workout_sections sec
+join public.workout_days d on d.id = sec.workout_day_id and d.name = 'Lower Body'
+join (values
+  ('Warm Up', 'Bodyweight Squat', 1, 2, 15),
+  ('Warm Up', 'Leg Swings', 2, 2, 12),
+  ('Workout', 'Barbell Back Squat', 1, 4, 10),
+  ('Workout', 'Romanian Deadlift', 2, 4, 10),
+  ('Workout', 'Bulgarian Split Squat', 3, 4, 12),
+  ('Workout', 'Leg Press', 4, 3, 15),
+  ('Core', 'Hanging Leg Raise', 1, 3, 12),
+  ('Core', 'Plank', 2, 3, 1)
+) as e(section_name, name, order_index, target_sets, target_reps)
+  on e.section_name = sec.name;
+
+-- Day 2: Upper Body
+insert into public.workout_sections (workout_day_id, name, order_index)
+select d.id, s.name, s.order_index
+from public.workout_days d, (values
+  ('Warm Up', 1),
+  ('Workout', 2),
+  ('Core', 3)
+) as s(name, order_index)
+where d.name = 'Upper Body';
+
+insert into public.exercises (section_id, name, order_index, target_sets, target_reps)
+select sec.id, e.name, e.order_index, e.target_sets, e.target_reps
+from public.workout_sections sec
+join public.workout_days d on d.id = sec.workout_day_id and d.name = 'Upper Body'
+join (values
+  ('Warm Up', 'Band Pull-Apart', 1, 2, 15),
+  ('Warm Up', 'Arm Circles', 2, 2, 12),
+  ('Workout', 'Barbell Bench Press', 1, 4, 10),
+  ('Workout', 'Bent-Over Row', 2, 4, 10),
+  ('Workout', 'Overhead Press', 3, 4, 10),
+  ('Workout', 'Lat Pulldown', 4, 3, 12),
+  ('Core', 'Cable Crunch', 1, 3, 15),
+  ('Core', 'Side Plank', 2, 3, 1)
+) as e(section_name, name, order_index, target_sets, target_reps)
+  on e.section_name = sec.name;
+
+-- Day 3: Conditioning
+insert into public.workout_sections (workout_day_id, name, order_index)
+select d.id, s.name, s.order_index
+from public.workout_days d, (values
+  ('Warm Up', 1),
+  ('Cardio', 2)
+) as s(name, order_index)
+where d.name = 'Conditioning';
+
+insert into public.exercises (section_id, name, order_index, target_sets, target_reps)
+select sec.id, e.name, e.order_index, e.target_sets, e.target_reps
+from public.workout_sections sec
+join public.workout_days d on d.id = sec.workout_day_id and d.name = 'Conditioning'
+join (values
+  ('Warm Up', 'Jumping Jacks', 1, 2, 20),
+  ('Cardio', 'Kettlebell Swing', 1, 4, 15),
+  ('Cardio', 'Rowing Machine (calories)', 2, 3, 20),
+  ('Cardio', 'Battle Ropes', 3, 3, 1)
+) as e(section_name, name, order_index, target_sets, target_reps)
+  on e.section_name = sec.name;
 
 -- ============================================================
 -- STORAGE: bucket for progress + meal photos

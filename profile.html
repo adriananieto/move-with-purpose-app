@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Move With Purpose" />
 <title>Move With Purpose · Profile</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=2" />
+<link rel="stylesheet" href="css/app.css?v=3" />
 </head>
 <body>
 
@@ -34,7 +34,7 @@ function weeksSince(dateStr) {
 
 function weightChart(logs) {
   if (logs.length < 2) {
-    return '<p class="mwp-body" style="font-size:11px; color:#8F867E; opacity:0.7; text-align:center; padding:20px 0;">Log your weight during a check-in to see your progress here.</p>';
+    return '<p class="mwp-body" style="font-size:12.5px; color:#8F867E; opacity:0.7; text-align:center; padding:22px 0;">Log your weight during a check-in to see your progress here.</p>';
   }
   const values = logs.map((l) => Number(l.weight_lb));
   const min = Math.min(...values);
@@ -52,7 +52,7 @@ function weightChart(logs) {
       <polyline points="${points}" fill="none" stroke="#8F867E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="#8F867E"/>
     </svg>
-    <div style="display:flex; justify-content:space-between; font-size:10px; color:#8F867E; margin-top:4px;" class="mwp-body">
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:#8F867E; margin-top:5px;" class="mwp-body">
       <span>${logs[0].logged_at}</span><span>${logs[logs.length - 1].logged_at}</span>
     </div>`;
 }
@@ -60,6 +60,14 @@ function weightChart(logs) {
 function photoTile(photo) {
   const url = sb.storage.from('photos').getPublicUrl(photo.storage_path).data.publicUrl;
   return `<div style="aspect-ratio:3/4; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; overflow:hidden;"><img src="${url}" alt="Progress photo" style="width:100%; height:100%; object-fit:cover;" /></div>`;
+}
+
+function statTile(value, label) {
+  return `
+    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:11px; padding:12px; text-align:center;">
+      <p class="mwp-title" style="font-size:16px; margin:0; color:#8F867E;">${value}</p>
+      <p class="mwp-body" style="font-size:10px; color:#8F867E; margin:3px 0 0; text-transform:uppercase;">${label}</p>
+    </div>`;
 }
 
 async function loadAndRender() {
@@ -78,42 +86,44 @@ async function loadAndRender() {
   const change = current !== null && first !== null ? (current - first).toFixed(1) : null;
   const memberSince = new Date(profile.member_since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+  const latestBodyFat = [...weightLogs].reverse().find((l) => l.body_fat_pct !== null);
+  const latestMuscle = [...weightLogs].reverse().find((l) => l.muscle_mass_pct !== null);
+  const showBodyComp = !!latestBodyFat || !!latestMuscle;
+
   document.getElementById('card').innerHTML = `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:1.2rem;">
-      <div style="width:50px; height:50px; border-radius:50%; background:#8F867E; display:flex; align-items:center; justify-content:center;">
-        <span class="mwp-title" style="font-size:15px; color:#FFFFFF;">${initials(profile.full_name)}</span>
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:1.3rem;">
+      <div style="width:56px; height:56px; border-radius:50%; background:#8F867E; display:flex; align-items:center; justify-content:center;">
+        <span class="mwp-title" style="font-size:17px; color:#FFFFFF;">${initials(profile.full_name)}</span>
       </div>
       <div style="flex:1;">
-        <p class="mwp-title" style="font-size:15px; margin:0; color:#8F867E; text-transform:uppercase;">${profile.full_name}</p>
-        <p class="mwp-body" style="font-size:10.5px; color:#8F867E; margin:0; opacity:0.75;">Member since ${memberSince}</p>
+        <p class="mwp-title" style="font-size:17px; margin:0; color:#8F867E; text-transform:uppercase;">${profile.full_name}</p>
+        <p class="mwp-body" style="font-size:11.5px; color:#8F867E; margin:0; opacity:0.75;">Member since ${memberSince}</p>
       </div>
-      <span class="mwp-body" style="font-size:9px; font-weight:600; letter-spacing:0.5px; background:#8F867E; color:#FFFFFF; padding:5px 10px; border-radius:6px; text-transform:uppercase;">${profile.plan_tier}</span>
+      <span class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; background:#8F867E; color:#FFFFFF; padding:6px 11px; border-radius:6px; text-transform:uppercase;">${profile.plan_tier}</span>
     </div>
 
-    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:1.2rem;">
-      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; text-align:center;">
-        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${current !== null ? current + ' lb' : '—'}</p>
-        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Current</p>
-      </div>
-      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; text-align:center;">
-        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${change !== null ? (change > 0 ? '+' : '') + change + ' lb' : '—'}</p>
-        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Since start</p>
-      </div>
-      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:10px; text-align:center;">
-        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${weeksSince(profile.member_since)}</p>
-        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Weeks</p>
-      </div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:9px; margin-bottom:${showBodyComp ? '9px' : '1.3rem'};">
+      ${statTile(current !== null ? current + ' lb' : '—', 'Current')}
+      ${statTile(change !== null ? (change > 0 ? '+' : '') + change + ' lb' : '—', 'Since start')}
+      ${statTile(weeksSince(profile.member_since), 'Weeks')}
     </div>
 
-    <p class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">Body Weight</p>
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:14px; margin-bottom:1.2rem;">
+    ${showBodyComp ? `
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:9px; margin-bottom:1.3rem;">
+        ${statTile(latestBodyFat ? latestBodyFat.body_fat_pct + '%' : '—', 'Body Fat')}
+        ${statTile(latestMuscle ? latestMuscle.muscle_mass_pct + '%' : '—', 'Muscle Mass')}
+      </div>
+    ` : ''}
+
+    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Body Weight</p>
+    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:16px; margin-bottom:1.3rem;">
       ${weightChart(weightLogs)}
     </div>
 
-    <p class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">Progress Photos</p>
-    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:0.5rem;">
+    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Progress Photos</p>
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:9px; margin-bottom:0.5rem;">
       ${photos.map(photoTile).join('')}
-      <label for="photoInput" style="cursor:pointer; aspect-ratio:3/4; background:#8F867E; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-plus" style="font-size:17px; color:#FFFFFF;" aria-hidden="true"></i></label>
+      <label for="photoInput" style="cursor:pointer; aspect-ratio:3/4; background:#8F867E; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-plus" style="font-size:19px; color:#FFFFFF;" aria-hidden="true"></i></label>
     </div>
     <input type="file" id="photoInput" accept="image/*" style="display:none;" />
     <p id="photoError" class="mwp-error" style="display:none;"></p>
