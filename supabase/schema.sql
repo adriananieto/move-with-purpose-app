@@ -254,7 +254,8 @@ select d.id, s.name, s.order_index
 from public.workout_days d, (values
   ('Warm Up', 1),
   ('Workout', 2),
-  ('Core', 3)
+  ('Core', 3),
+  ('Cardio', 4)
 ) as s(name, order_index)
 where d.name = 'Lower Body';
 
@@ -270,7 +271,8 @@ join (values
   ('Workout', 'Bulgarian Split Squat', 3, 4, 12),
   ('Workout', 'Leg Press', 4, 3, 15),
   ('Core', 'Hanging Leg Raise', 1, 3, 12),
-  ('Core', 'Plank', 2, 3, 1)
+  ('Core', 'Plank', 2, 3, 1),
+  ('Cardio', 'Incline Treadmill Walk (15 min)', 1, 1, 1)
 ) as e(section_name, name, order_index, target_sets, target_reps)
   on e.section_name = sec.name;
 
@@ -280,7 +282,8 @@ select d.id, s.name, s.order_index
 from public.workout_days d, (values
   ('Warm Up', 1),
   ('Workout', 2),
-  ('Core', 3)
+  ('Core', 3),
+  ('Cardio', 4)
 ) as s(name, order_index)
 where d.name = 'Upper Body';
 
@@ -296,7 +299,8 @@ join (values
   ('Workout', 'Overhead Press', 3, 4, 10),
   ('Workout', 'Lat Pulldown', 4, 3, 12),
   ('Core', 'Cable Crunch', 1, 3, 15),
-  ('Core', 'Side Plank', 2, 3, 1)
+  ('Core', 'Side Plank', 2, 3, 1),
+  ('Cardio', 'Stationary Bike (15 min)', 1, 1, 1)
 ) as e(section_name, name, order_index, target_sets, target_reps)
   on e.section_name = sec.name;
 
