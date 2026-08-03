@@ -13,10 +13,6 @@ body {
   min-height: 100dvh;
   background: #EAE6E1;
   font-family: 'Work Sans', sans-serif;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 2rem 1rem calc(2rem + env(safe-area-inset-bottom)) 1rem;
   overscroll-behavior-y: none;
 }
 
@@ -26,11 +22,27 @@ body {
 .mwp-card {
   position: relative;
   background: #D7D4D3;
-  border-radius: 26px;
-  padding: 1.6rem 1.3rem;
+  padding: calc(1.6rem + env(safe-area-inset-top)) 1.3rem calc(1.6rem + env(safe-area-inset-bottom)) 1.3rem;
   overflow: hidden;
-  max-width: 340px;
   width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Full-bleed on phones; centered "device" card on wider screens */
+@media (min-width: 480px) {
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .mwp-card {
+    max-width: 340px;
+    min-height: 0;
+    border-radius: 26px;
+    padding: 1.6rem 1.3rem;
+  }
 }
 
 .mwp-input, .mwp-select, .mwp-textarea {
