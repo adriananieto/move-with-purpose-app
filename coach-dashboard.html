@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
+<title>Move With Purpose · Coach</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css?v=3" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script>
+function initials(name) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+
+function isFlagged(c) {
+  return c && (c.energy_level <= 2 || c.stress_level <= 2);
+}
+
+function clientRow(client, checkin, weightChange) {
+  const href = checkin ? `coach-checkin-detail.html?checkin=${checkin.id}` : '#';
+  const flagged = isFlagged(checkin);
+  const summary = checkin
+    ? `${weightChange !== null ? (weightChange > 0 ? '+' : '') + weightChange + ' lb · ' : ''}Energy ${checkin.energy_level ?? '—'}/5 · Adherence ${checkin.adherence_level ?? '—'}/5`
+    : 'Not submitted yet';
+
+  return `
+    <a href="${href}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); ${flagged ? 'border-left:3px solid #C0392B;' : ''} border-radius:12px; padding:13px 14px; ${checkin ? '' : 'opacity:0.55;'}">
+      <div style="width:38px; height:38px; border-radius:50%; background:${checkin ? '#8F867E' : '#C4BEB4'}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        <span class="mwp-title" style="font-size:13px; color:#FFFFFF;">${initials(client.full_name)}</span>
+      </div>
+      <div style="flex:1;">
+        <p class="mwp-title" style="font-size:13px; margin:0; color:#8F867E; text-transform:uppercase;">${client.full_name}</p>
+        <p class="mwp-body" style="font-size:11.5px; color:#8F867E; margin:1px 0 0; opacity:0.75;">${summary}</p>
+      </div>
+      ${flagged ? '<i class="ti ti-flag" style="font-size:16px; color:#C0392B;" aria-hidden="true"></i>' : (checkin ? '<i class="ti ti-check" style="font-size:17px; color:#8F867E;" aria-hidden="true"></i>' : '')}
+    </a>`;
+}
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+
+  const { data: myProfile } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
+  if (myProfile?.role !== 'coach') {
+    window.location.href = 'home.html';
+    return;
+  }
+
+  const card = document.getElementById('card');
+
+  const [clientsRes, checkinsRes] = await Promise.all([
+    sb.from('profiles').select('id, full_name').eq('role', 'client').order('full_name'),
+    sb.from('checkins').select('*').order('submitted_at', { ascending: false }),
+  ]);
+
+  const clients = clientsRes.data || [];
+  const allCheckins = checkinsRes.data || [];
+
+  const latestByClient = {};
+  allCheckins.forEach((c) => {
+    if (!latestByClient[c.user_id]) latestByClient[c.user_id] = c;
+  });
+
+  const rows = clients.map((client) => {
+    const checkin = latestByClient[client.id] || null;
+    let weightChange = null;
+    if (checkin) {
+      const clientCheckins = allCheckins.filter((c) => c.user_id === client.id).sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+      if (clientCheckins.length > 1 && clientCheckins[0].fasting_weight_lb && checkin.fasting_weight_lb) {
+        weightChange = Math.round((checkin.fasting_weight_lb - clientCheckins[0].fasting_weight_lb) * 10) / 10;
+      }
+    }
+    return { client, checkin, weightChange };
+  });
+
+  const submitted = rows.filter((r) => r.checkin).length;
+  const flagged = rows.filter((r) => isFlagged(r.checkin)).length;
+  const pending = rows.length - submitted;
+
+  card.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.1rem;">
+      <p class="mwp-title" style="font-size:22px; margin:0; color:#8F867E; text-transform:uppercase;">Client Check-ins</p>
+      <button id="logoutBtn" style="width:36px; height:36px; border-radius:50%; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;"><i class="ti ti-logout" style="font-size:17px; color:#8F867E;" aria-hidden="true"></i></button>
+    </div>
+
+    <div style="display:flex; gap:9px; margin-bottom:1.2rem;">
+      <div style="flex:1; background:#8F867E; border-radius:11px; padding:11px; text-align:center;">
+        <p class="mwp-title" style="font-size:17px; margin:0; color:#FFFFFF;">${submitted}/${rows.length}</p>
+        <p class="mwp-body" style="font-size:9px; color:#EAE6E1; margin:2px 0 0; text-transform:uppercase;">Submitted</p>
+      </div>
+      <div style="flex:1; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:11px; padding:11px; text-align:center;">
+        <p class="mwp-title" style="font-size:17px; margin:0; color:#8F867E;">${flagged}</p>
+        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Flagged</p>
+      </div>
+      <div style="flex:1; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:11px; padding:11px; text-align:center;">
+        <p class="mwp-title" style="font-size:17px; margin:0; color:#8F867E;">${pending}</p>
+        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">Pending</p>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:9px;">
+      ${rows.length ? rows.map((r) => clientRow(r.client, r.checkin, r.weightChange)).join('') : '<p class="mwp-loading">No clients yet.</p>'}
+    </div>
+  `;
+
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+})();
+</script>
+</body>
+</html>

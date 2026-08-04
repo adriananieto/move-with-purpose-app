@@ -8,6 +8,8 @@
 -- ============================================================
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists public.handle_new_user();
+drop function if exists public.is_coach();
+drop function if exists public.prevent_role_self_escalation() cascade;
 
 drop policy if exists "photos: read all" on storage.objects;
 drop policy if exists "photos: owner insert" on storage.objects;
@@ -35,16 +37,49 @@ create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   plan_tier text not null default 'Premium',
+  role text not null default 'client' check (role in ('client','coach')),
   member_since date not null default current_date,
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles enable row level security;
 
+-- Bypasses RLS on purpose: used inside policies below to check the caller's
+-- own role without recursing into the profiles RLS it's being called from.
+create function public.is_coach()
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'coach');
+$$;
+
 create policy "profiles: read own" on public.profiles
   for select using (auth.uid() = id);
+create policy "profiles: coach read all" on public.profiles
+  for select using (public.is_coach());
 create policy "profiles: update own" on public.profiles
   for update using (auth.uid() = id);
+
+-- Client API requests always run with auth.uid() set; the SQL Editor in the
+-- Supabase dashboard does not, so this only blocks role changes made through
+-- the app (e.g. a client self-promoting to coach), not ones you make by hand.
+create function public.prevent_role_self_escalation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if auth.uid() is not null and new.role is distinct from old.role then
+    new.role := old.role;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_prevent_role_change
+  before update on public.profiles
+  for each row execute function public.prevent_role_self_escalation();
 
 -- ============================================================
 -- BODY WEIGHT + COMPOSITION LOGS
@@ -217,6 +252,10 @@ create policy "checkins: owner select/insert" on public.checkins
   for select using (auth.uid() = user_id);
 create policy "checkins: owner insert" on public.checkins
   for insert with check (auth.uid() = user_id);
+create policy "checkins: coach read all" on public.checkins
+  for select using (public.is_coach());
+create policy "checkins: coach reply" on public.checkins
+  for update using (public.is_coach());
 
 -- ============================================================
 -- NEW USER SETUP (auto-create profile + defaults on signup)
