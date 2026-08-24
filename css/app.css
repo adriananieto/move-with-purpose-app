@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400&family=Montserrat:wght@500;600&display=swap');
 
 * { box-sizing: border-box; }
 
@@ -7,21 +7,33 @@ html {
   text-size-adjust: 100%;
 }
 
+:root {
+  --froth: #F1EEEB;
+  --ink: #211E1B;
+  --latte: #A09086;
+  --creme: #CDC6C3;
+  --chai: #E4D8CB;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  background: #EAE6E1;
-  font-family: 'Work Sans', sans-serif;
+  background: var(--froth);
+  font-family: 'Poppins', sans-serif;
   overscroll-behavior-y: none;
 }
 
-.mwp-title { font-family: 'Anton', sans-serif; }
-.mwp-body { font-family: 'Work Sans', sans-serif; }
+.mwp-title { font-family: 'Poppins', sans-serif; font-weight: 300; }
+.mwp-body { font-family: 'Poppins', sans-serif; font-weight: 400; }
+.mwp-label { font-family: 'Montserrat', sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
 
 .mwp-card {
   position: relative;
-  background: #D7D4D3;
+  background: var(--froth);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-repeat: repeat;
   padding: calc(1.6rem + env(safe-area-inset-top)) 1.3rem calc(1.6rem + env(safe-area-inset-bottom)) 1.3rem;
   overflow: hidden;
   width: 100%;
@@ -45,13 +57,34 @@ body {
   }
 }
 
+.mwp-header { text-align: center; margin-bottom: 1.3rem; }
+.mwp-logo {
+  color: var(--ink);
+  width: 78px;
+  margin: 0 auto;
+  line-height: 0;
+}
+.mwp-logo svg { display: block; width: 100%; height: auto; }
+.mwp-daylabel {
+  font-size: 10px;
+  color: var(--latte);
+  margin: 8px 0 0;
+}
+.mwp-section-title {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 300;
+  font-size: 22px;
+  color: var(--ink);
+  margin: 4px 0 0;
+}
+
 .mwp-input, .mwp-select, .mwp-textarea {
   width: 100%;
   border: 0.5px solid rgba(0,0,0,0.1);
   border-radius: 8px;
-  font-family: 'Work Sans', sans-serif;
-  color: #8F867E;
-  background: #FFFFFF;
+  font-family: 'Poppins', sans-serif;
+  color: var(--ink);
+  background: var(--chai);
   padding: 12px 14px;
   font-size: 16px;
 }
@@ -60,25 +93,26 @@ body {
 
 .mwp-btn {
   width: 100%;
-  background: #8F867E;
-  color: #FFFFFF;
+  background: var(--ink);
+  color: var(--froth);
   border: none;
-  font-size: 15px;
+  font-size: 14px;
   padding: 15px;
   border-radius: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-family: 'Anton', sans-serif;
+  letter-spacing: 1px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.mwp-btn:disabled { opacity: 0.6; cursor: default; }
+.mwp-btn:disabled { opacity: 0.5; cursor: default; }
 
 .mwp-btn-link {
   background: none;
   border: none;
-  color: #8F867E;
-  font-family: 'Work Sans', sans-serif;
+  color: var(--latte);
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
@@ -86,16 +120,17 @@ body {
 }
 
 .mwp-error {
-  color: #C0392B;
+  color: var(--ink);
+  font-weight: 600;
   font-size: 12.5px;
-  font-family: 'Work Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   margin: 0 0 10px;
 }
 
 .mwp-loading {
-  color: #8F867E;
+  color: var(--latte);
   font-size: 13px;
-  font-family: 'Work Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   text-align: center;
   padding: 2rem 0;
 }

@@ -5,26 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png" />
+<link rel="icon" href="assets/mova-app-icon.png" />
+<title>MOVA</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
 <div class="mwp-card">
-  <div style="text-align:center; margin-bottom:1.5rem;">
-    <p class="mwp-body" style="font-size:10px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Welcome to</p>
-    <p class="mwp-title" style="font-size:30px; margin:0; color:#8F867E; text-transform:uppercase;">Move With Purpose</p>
+  <div class="mwp-header">
+    <div class="mwp-logo" id="logoSlot"></div>
+    <p class="mwp-label mwp-daylabel">Move With Purpose</p>
   </div>
 
   <div style="display:flex; gap:7px; margin-bottom:1.3rem;">
-    <button id="tabLogin" class="mwp-body" style="flex:1; padding:10px; border-radius:8px; border:none; background:#8F867E; color:#FFFFFF; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer;">Log in</button>
-    <button id="tabSignup" class="mwp-body" style="flex:1; padding:10px; border-radius:8px; border:none; background:#FFFFFF; color:#8F867E; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer;">Sign up</button>
+    <button id="tabLogin" class="mwp-label" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--ink); color:var(--froth); font-size:12px; cursor:pointer;">Log in</button>
+    <button id="tabSignup" class="mwp-label" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--chai); color:var(--ink); font-size:12px; cursor:pointer;">Sign up</button>
   </div>
 
   <p id="formError" class="mwp-error" style="display:none;"></p>
-  <p id="formNotice" class="mwp-body" style="color:#8F867E; font-size:12.5px; margin:0 0 10px; display:none;"></p>
+  <p id="formNotice" class="mwp-body" style="color:var(--latte); font-size:12.5px; margin:0 0 10px; display:none;"></p>
 
   <form id="authForm">
     <div id="nameField" style="margin-bottom:8px; display:none;">
@@ -42,7 +44,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
 <script>
+document.getElementById('logoSlot').innerHTML = MOVA_WORDMARK_SVG;
+
 let mode = 'login';
 const tabLogin = document.getElementById('tabLogin');
 const tabSignup = document.getElementById('tabSignup');
@@ -54,10 +59,10 @@ const formNotice = document.getElementById('formNotice');
 function setMode(next) {
   mode = next;
   const isLogin = mode === 'login';
-  tabLogin.style.background = isLogin ? '#8F867E' : '#FFFFFF';
-  tabLogin.style.color = isLogin ? '#FFFFFF' : '#8F867E';
-  tabSignup.style.background = isLogin ? '#FFFFFF' : '#8F867E';
-  tabSignup.style.color = isLogin ? '#8F867E' : '#FFFFFF';
+  tabLogin.style.background = isLogin ? 'var(--ink)' : 'var(--chai)';
+  tabLogin.style.color = isLogin ? 'var(--froth)' : 'var(--ink)';
+  tabSignup.style.background = isLogin ? 'var(--chai)' : 'var(--ink)';
+  tabSignup.style.color = isLogin ? 'var(--ink)' : 'var(--froth)';
   nameField.style.display = isLogin ? 'none' : 'block';
   submitBtn.textContent = isLogin ? 'Log in' : 'Sign up';
   formError.style.display = 'none';

@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose · Exercise</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png" />
+<link rel="icon" href="assets/mova-app-icon.png" />
+<title>MOVA · Exercise</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
@@ -19,8 +21,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
 <script>
-let userId, dayId, orderedExercises, current, todayStr;
+let userId, dayId, dayName, orderedExercises, current, todayStr;
 
 async function loadDay() {
   const { data: day, error } = await sb
@@ -34,6 +37,7 @@ async function loadDay() {
     return null;
   }
 
+  dayName = day.name;
   const sections = [...day.workout_sections].sort((a, b) => a.order_index - b.order_index);
   return sections.flatMap((s) => [...s.exercises].sort((a, b) => a.order_index - b.order_index));
 }
@@ -47,14 +51,14 @@ async function loadState(exerciseId) {
 
   const { data: todayLogs } = await sb
     .from('exercise_logs')
-    .select('set_number')
+    .select('set_number, weight_lb')
     .eq('user_id', userId)
     .eq('exercise_id', current.id)
-    .gte('logged_at', todayStr + 'T00:00:00')
-    .order('set_number', { ascending: false })
-    .limit(1);
+    .gte('logged_at', todayStr + 'T00:00:00');
 
-  const setsDone = todayLogs?.[0]?.set_number || 0;
+  current.todayWeights = {};
+  (todayLogs || []).forEach((l) => { current.todayWeights[l.set_number] = l.weight_lb; });
+  const setsDone = Object.keys(current.todayWeights).length;
   current.currentSet = setsDone + 1;
 
   if (setsDone >= current.target_sets) {
@@ -62,58 +66,95 @@ async function loadState(exerciseId) {
     return;
   }
 
-  const { data: lastLog } = await sb
+  const { data: priorLogs } = await sb
     .from('exercise_logs')
     .select('weight_lb, logged_at')
     .eq('user_id', userId)
     .eq('exercise_id', current.id)
     .lt('logged_at', todayStr + 'T00:00:00')
     .order('logged_at', { ascending: false })
-    .limit(1);
-  current.lastWeight = lastLog?.[0]?.weight_lb ?? null;
+    .limit(30);
+
+  current.topSetLastSession = null;
+  if (priorLogs && priorLogs.length) {
+    const latestDate = priorLogs[0].logged_at.slice(0, 10);
+    const sameSession = priorLogs.filter((l) => l.logged_at.slice(0, 10) === latestDate && l.weight_lb !== null);
+    if (sameSession.length) {
+      current.topSetLastSession = Math.max(...sameSession.map((l) => Number(l.weight_lb)));
+    }
+  }
 
   render();
+}
+
+function setRow(setNumber) {
+  const completed = current.todayWeights[setNumber] !== undefined;
+  const isCurrent = setNumber === current.currentSet;
+
+  if (completed) {
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--chai); border-radius:10px; padding:10px 14px;">
+        <span class="mwp-body" style="font-size:13px; color:var(--ink);">Set ${setNumber}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="mwp-body" style="font-size:13px; color:var(--ink);">${current.todayWeights[setNumber] ?? '—'} lb</span>
+          <i class="ti ti-circle-check-filled" style="font-size:17px; color:var(--ink);" aria-hidden="true"></i>
+        </div>
+      </div>`;
+  }
+
+  if (isCurrent) {
+    return `
+      <div style="background:var(--ink); border-radius:10px; padding:10px 14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <span class="mwp-label" style="font-size:12px; color:var(--froth);">Set ${setNumber}</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="number" id="weightInput" value="${current.topSetLastSession ?? ''}" placeholder="0" style="width:64px; text-align:center; font-size:16px; font-weight:600; height:34px; border-radius:6px; border:none; font-family:'Poppins',sans-serif;" aria-label="Pounds used" />
+            <span class="mwp-body" style="font-size:12px; color:var(--froth);">lb</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div style="display:flex; align-items:center; background:transparent; border:0.5px solid var(--creme); border-radius:10px; padding:10px 14px;">
+      <span class="mwp-body" style="font-size:13px; color:var(--latte);">Set ${setNumber}</span>
+    </div>`;
 }
 
 function render() {
   const idx = orderedExercises.findIndex((e) => e.id === current.id);
   const card = document.getElementById('card');
   card.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.2rem;">
-      <a href="workout-day.html?day=${dayId}" style="line-height:0;"><i class="ti ti-chevron-left" style="font-size:20px; color:#8F867E;" aria-hidden="true"></i></a>
-      <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:1px; color:#8F867E; margin:0; text-transform:uppercase;">Exercise ${idx + 1} of ${orderedExercises.length}</p>
-      <span style="width:20px;"></span>
-    </div>
+    <div id="headerSlot"></div>
+    <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0 0 4px; text-align:center;">${dayName}</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.1rem; text-align:center;">Exercise ${idx + 1} of ${orderedExercises.length}</p>
 
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; aspect-ratio:4/3; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
+    <div style="background:var(--chai); border-radius:14px; aspect-ratio:4/3; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
       ${current.video_url
         ? `<video src="${current.video_url}" controls style="width:100%; height:100%; border-radius:14px; object-fit:cover;"></video>`
-        : '<i class="ti ti-video" style="font-size:34px; color:#C4BEB4;" aria-hidden="true"></i>'}
+        : '<i class="ti ti-video" style="font-size:34px; color:var(--latte);" aria-hidden="true"></i>'}
     </div>
 
-    <p class="mwp-title" style="font-size:22px; margin:0 0 4px; color:#8F867E; text-transform:uppercase; letter-spacing:0.3px;">${current.name}</p>
-    <p class="mwp-body" style="font-size:13px; color:#8F867E; margin:0 0 1.2rem;">Set ${current.currentSet} of ${current.target_sets} · target ${current.target_reps} reps</p>
+    <p class="mwp-title" style="font-size:22px; margin:0 0 4px; color:var(--ink);">${current.name}</p>
+    <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0 0 1.1rem;">${current.target_sets} sets · ${current.target_reps} reps</p>
 
-    <div style="background:#8F867E; border-radius:12px; padding:14px; margin-bottom:12px;">
-      <p class="mwp-body" style="font-size:10px; font-weight:500; letter-spacing:1px; color:#EAE6E1; margin:0 0 8px; text-transform:uppercase;">Weight used</p>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <input type="number" id="weightInput" value="${current.lastWeight ?? ''}" placeholder="0" style="flex:1; text-align:center; font-size:22px; font-weight:700; height:44px; border-radius:8px; border:none;" aria-label="Pounds used" />
-        <span class="mwp-body" style="font-size:13px; color:#FFFFFF;">lb</span>
-      </div>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+      ${Array.from({ length: current.target_sets }, (_, i) => setRow(i + 1)).join('')}
     </div>
 
-    <div style="display:flex; align-items:center; gap:6px; margin-bottom:1rem; font-size:12px; color:#8F867E;" class="mwp-body">
+    <div style="display:flex; align-items:center; gap:6px; margin-bottom:1rem; font-size:12px; color:var(--latte);" class="mwp-body">
       <i class="ti ti-history" style="font-size:15px;" aria-hidden="true"></i>
-      <span>${current.lastWeight !== null ? `Last time: ${current.lastWeight} lb` : 'No previous record'}</span>
+      <span>${current.topSetLastSession !== null ? `Top set last session: ${current.topSetLastSession} lb` : 'No previous record'}</span>
     </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 6px; text-transform:uppercase;">Notes (optional)</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 6px;">Notes (optional)</p>
     <textarea id="notesInput" placeholder="Anything that bothered you, couldn't complete, felt heavy..." class="mwp-textarea" style="height:56px; margin-bottom:1.2rem;"></textarea>
 
     <p id="saveError" class="mwp-error" style="display:none;"></p>
-    <button id="saveBtn" class="mwp-btn">Save Set</button>
+    <button id="saveBtn" class="mwp-btn">Complete Set ${current.currentSet}</button>
   `;
 
+  renderHeader(document.getElementById('headerSlot'), { userId });
   document.getElementById('saveBtn').addEventListener('click', saveSet);
 }
 
@@ -124,9 +165,9 @@ function renderNotFound() {
 function renderDayComplete() {
   document.getElementById('card').innerHTML = `
     <div style="text-align:center; padding: 2.5rem 0;">
-      <i class="ti ti-circle-check" style="font-size:44px; color:#8F867E;" aria-hidden="true"></i>
-      <p class="mwp-title" style="font-size:20px; margin:1rem 0 6px; color:#8F867E; text-transform:uppercase;">Workout complete</p>
-      <p class="mwp-body" style="font-size:13px; color:#8F867E; margin:0 0 1.3rem;">Great work today. See you next session.</p>
+      <i class="ti ti-circle-check" style="font-size:44px; color:var(--ink);" aria-hidden="true"></i>
+      <p class="mwp-title" style="font-size:20px; margin:1rem 0 6px; color:var(--ink);">Workout complete</p>
+      <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0 0 1.3rem;">Great work today. See you next session.</p>
       <a href="workout.html" class="mwp-btn" style="display:block; text-decoration:none; box-sizing:border-box;">Back to training split</a>
     </div>
   `;

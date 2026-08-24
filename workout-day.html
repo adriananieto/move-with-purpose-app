@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose · Workout Day</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png" />
+<link rel="icon" href="assets/mova-app-icon.png" />
+<title>MOVA · Workout Day</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
@@ -19,6 +21,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
 <script>
 (async () => {
   const session = await requireSession();
@@ -51,42 +54,54 @@
   });
 
   const sections = [...day.workout_sections].sort((a, b) => a.order_index - b.order_index);
+  const allExercises = sections.flatMap((s) => s.exercises);
+  const isCardio = (sec) => sec.name.toLowerCase() === 'cardio';
+  const exercisesDone = allExercises.filter((e) => (setsLoggedByExercise[e.id] || 0) >= e.target_sets).length;
 
-  function exerciseRow(ex) {
+  function exerciseRow(ex, cardio) {
     const setsDone = setsLoggedByExercise[ex.id] || 0;
     const complete = setsDone >= ex.target_sets;
+    const detail = cardio
+      ? `${ex.target_reps} min`
+      : `${ex.target_sets} sets × ${ex.target_reps} reps`;
     return `
-      <a href="workout-exercise.html?exercise=${ex.id}&day=${day.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:14px 16px;">
-        <div>
-          <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E; text-transform:uppercase;">${ex.name}</p>
-          <p class="mwp-body" style="font-size:12px; color:#8F867E; margin:2px 0 0; opacity:0.7;">${ex.target_sets} sets × ${ex.target_reps} reps</p>
+      <a href="workout-exercise.html?exercise=${ex.id}&day=${day.id}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:var(--chai); border-radius:12px; padding:14px 16px;">
+        <i class="ti ti-video" style="font-size:17px; color:var(--latte); flex-shrink:0;" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${ex.name}</p>
+          <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${detail}</p>
         </div>
         ${complete
-          ? '<i class="ti ti-circle-check" style="font-size:19px; color:#8F867E;" aria-hidden="true"></i>'
-          : `<span class="mwp-body" style="font-size:12px; color:#8F867E; opacity:0.6;">${setsDone}/${ex.target_sets}</span>`}
+          ? '<i class="ti ti-circle-check" style="font-size:19px; color:var(--ink);" aria-hidden="true"></i>'
+          : `<span class="mwp-body" style="font-size:12px; color:var(--latte);">${setsDone}/${ex.target_sets}</span>`}
       </a>`;
   }
 
   card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:1.2rem;">
-      <a href="workout.html" style="line-height:0;"><i class="ti ti-chevron-left" style="font-size:20px; color:#8F867E;" aria-hidden="true"></i></a>
-      <div>
-        <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 3px; text-transform:uppercase; opacity:0.7;">Day ${day.day_number}</p>
-        <p class="mwp-title" style="font-size:22px; margin:0; color:#8F867E; text-transform:uppercase;">${day.name}</p>
-      </div>
-    </div>
+    <div id="headerSlot"></div>
+    <a href="workout.html" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; margin-bottom:1rem;">
+      <i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>
+      <span class="mwp-body" style="font-size:12px; color:var(--latte);">Training split</span>
+    </a>
+
+    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.2rem;">Workout Progress &nbsp;·&nbsp; ${exercisesDone} / ${allExercises.length}</p>
 
     <div style="display:flex; flex-direction:column; gap:18px;">
       ${sections.map((sec) => `
         <div>
-          <p class="mwp-body" style="font-size:12px; font-weight:600; letter-spacing:0.8px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">${sec.name}</p>
+          <p class="mwp-label" style="font-size:12px; color:var(--ink); margin:0 0 8px;">${sec.name}</p>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            ${[...sec.exercises].sort((a, b) => a.order_index - b.order_index).map(exerciseRow).join('')}
+            ${[...sec.exercises].sort((a, b) => a.order_index - b.order_index).map((ex) => exerciseRow(ex, isCardio(sec))).join('')}
           </div>
         </div>
       `).join('')}
     </div>
+
+    <div data-bottom-nav></div>
   `;
+
+  renderHeader(document.getElementById('headerSlot'), { userId, title: day.name });
+  renderBottomNav('workout');
 })();
 </script>
 </body>

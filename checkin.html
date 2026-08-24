@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose · Check-in</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png" />
+<link rel="icon" href="assets/mova-app-icon.png" />
+<title>MOVA · Check-in</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 <style>
-.scale-btn { flex:1; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.08); border-radius:6px; padding:9px 0; font-size:13px; font-family:'Work Sans',sans-serif; color:#8F867E; text-align:center; cursor:pointer; }
-.scale-btn.active { background:#8F867E; color:#FFFFFF; border-color:#8F867E; }
+.scale-btn { flex:1; background:var(--chai); border:none; border-radius:6px; padding:9px 0; font-size:13px; font-family:'Poppins',sans-serif; color:var(--ink); text-align:center; cursor:pointer; }
+.scale-btn.active { background:var(--ink); color:var(--froth); }
 </style>
 </head>
 <body>
@@ -23,6 +25,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
 <script>
 let userId, weekNumber;
 const state = { hunger: null, energy: null, adherence: null, stress: null, weight: '', bodyFat: '', muscleMass: '', feedback: '' };
@@ -33,38 +36,37 @@ function scaleRow(field, label) {
     `<div class="scale-btn ${state[field] === n ? 'active' : ''}" data-field="${field}" data-value="${n}">${n}</div>`
   ).join('');
   return `
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">${label}</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">${label}</p>
     <div style="display:flex; gap:6px; margin-bottom:1rem;">${btns}</div>`;
 }
 
 function render() {
   document.getElementById('card').innerHTML = `
-    <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Week ${weekNumber}</p>
-    <p class="mwp-title" style="font-size:23px; margin:0 0 1.2rem; color:#8F867E; text-transform:uppercase;">Weekly Check-in</p>
+    <div id="headerSlot"></div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Fasting weight</p>
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:8px; margin-bottom:0.9rem; height:46px;">
-      <input type="number" id="weightInput" value="${state.weight}" style="flex:1; border:none; font-size:16px; font-weight:600; color:#8F867E;" aria-label="Fasting weight" />
-      <span class="mwp-body" style="font-size:12px; color:#8F867E;">lb</span>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">Fasting weight</p>
+    <div style="background:var(--chai); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:8px; margin-bottom:0.9rem; height:46px;">
+      <input type="number" id="weightInput" value="${state.weight}" style="flex:1; border:none; background:transparent; font-size:16px; font-weight:600; color:var(--ink); font-family:'Poppins',sans-serif;" aria-label="Fasting weight" />
+      <span class="mwp-body" style="font-size:12px; color:var(--latte);">lb</span>
     </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Body composition (optional)</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">Body composition (optional)</p>
     <div style="display:flex; gap:8px; margin-bottom:1rem;">
-      <div style="flex:1; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
-        <input type="number" id="bodyFatInput" value="${state.bodyFat}" placeholder="—" style="flex:1; width:0; border:none; font-size:16px; font-weight:600; color:#8F867E;" aria-label="Body fat percent" />
-        <span class="mwp-body" style="font-size:11px; color:#8F867E;">% fat</span>
+      <div style="flex:1; background:var(--chai); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
+        <input type="number" id="bodyFatInput" value="${state.bodyFat}" placeholder="—" style="flex:1; width:0; border:none; background:transparent; font-size:16px; font-weight:600; color:var(--ink); font-family:'Poppins',sans-serif;" aria-label="Body fat percent" />
+        <span class="mwp-body" style="font-size:11px; color:var(--latte);">% fat</span>
       </div>
-      <div style="flex:1; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
-        <input type="number" id="muscleMassInput" value="${state.muscleMass}" placeholder="—" style="flex:1; width:0; border:none; font-size:16px; font-weight:600; color:#8F867E;" aria-label="Muscle mass percent" />
-        <span class="mwp-body" style="font-size:11px; color:#8F867E;">% muscle</span>
+      <div style="flex:1; background:var(--chai); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
+        <input type="number" id="muscleMassInput" value="${state.muscleMass}" placeholder="—" style="flex:1; width:0; border:none; background:transparent; font-size:16px; font-weight:600; color:var(--ink); font-family:'Poppins',sans-serif;" aria-label="Muscle mass in pounds" />
+        <span class="mwp-body" style="font-size:11px; color:var(--latte);">lb muscle</span>
       </div>
     </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Photos</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">Photos</p>
     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:1rem;">
       ${[0, 1, 2].map((i) => `
-        <label for="photo${i}" style="cursor:pointer; aspect-ratio:3/4; background:#FFFFFF; border:1.5px dashed #C4BEB4; border-radius:9px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-          ${photoFiles[i] ? `<span class="mwp-body" style="font-size:10px; color:#8F867E; padding:4px; text-align:center;">${photoFiles[i].name}</span>` : '<i class="ti ti-camera" style="font-size:16px; color:#C4BEB4;" aria-hidden="true"></i>'}
+        <label for="photo${i}" style="cursor:pointer; aspect-ratio:3/4; background:var(--chai); border:1.5px dashed var(--creme); border-radius:9px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          ${photoFiles[i] ? `<span class="mwp-body" style="font-size:10px; color:var(--ink); padding:4px; text-align:center;">${photoFiles[i].name}</span>` : '<i class="ti ti-camera" style="font-size:16px; color:var(--latte);" aria-hidden="true"></i>'}
         </label>
         <input type="file" id="photo${i}" accept="image/*" style="display:none;" />
       `).join('')}
@@ -75,12 +77,14 @@ function render() {
     ${scaleRow('adherence', 'Plan adherence')}
     ${scaleRow('stress', 'Stress / sleep quality')}
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">General feedback</p>
-    <textarea id="feedbackInput" placeholder="How did you feel this week, any questions, adjustments..." class="mwp-textarea" style="height:64px; margin-bottom:1.3rem;">${state.feedback}</textarea>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">General feedback</p>
+    <textarea id="feedbackInput" placeholder="How did this week feel? Any questions or adjustments needed..." class="mwp-textarea" style="height:64px; margin-bottom:1.3rem;">${state.feedback}</textarea>
 
     <p id="submitError" class="mwp-error" style="display:none;"></p>
     <button id="submitBtn" class="mwp-btn">Submit Check-in</button>
   `;
+
+  renderHeader(document.getElementById('headerSlot'), { userId, title: 'Weekly Check-in' });
 
   document.querySelectorAll('.scale-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -136,7 +140,7 @@ async function submit() {
     week_number: weekNumber,
     fasting_weight_lb: weight,
     body_fat_pct: bodyFat,
-    muscle_mass_pct: muscleMass,
+    muscle_mass_lb: muscleMass,
     hunger_level: state.hunger,
     energy_level: state.energy,
     adherence_level: state.adherence,
@@ -155,7 +159,7 @@ async function submit() {
     user_id: userId,
     weight_lb: weight,
     body_fat_pct: bodyFat,
-    muscle_mass_pct: muscleMass,
+    muscle_mass_lb: muscleMass,
   });
 
   for (let i = 0; i < photoFiles.length; i++) {
@@ -176,9 +180,8 @@ async function submit() {
   if (!session) return;
   userId = session.user.id;
 
-  const { data: profile } = await sb.from('profiles').select('member_since').eq('id', userId).single();
-  const ms = Date.now() - new Date(profile.member_since).getTime();
-  weekNumber = Math.max(1, Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1);
+  const phaseStartDate = await getPhaseStartDate(userId);
+  weekNumber = phaseStartDate ? computeDayWeek(phaseStartDate).week : 1;
 
   render();
 })();

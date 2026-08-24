@@ -6,6 +6,10 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8000"],
       "port": 8000
+    },
+    {
+      "name": "mova-attach",
+      "url": "http://localhost:8000"
     }
   ]
 }

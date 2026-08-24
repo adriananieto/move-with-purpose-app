@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose · Nutrition</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png" />
+<link rel="icon" href="assets/mova-app-icon.png" />
+<title>MOVA · Nutrition</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
@@ -22,7 +24,7 @@
 <script src="js/nav.js"></script>
 <script>
 const MEAL_ICONS = { breakfast: 'ti-sun', snack_am: 'ti-coffee', lunch: 'ti-sun-high', snack_pm: 'ti-cookie', dinner: 'ti-moon' };
-const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Morning Snack', lunch: 'Lunch', snack_pm: 'Afternoon Snack', dinner: 'Dinner' };
+const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Snack AM', lunch: 'Lunch', snack_pm: 'Snack PM', dinner: 'Dinner' };
 const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
 
 (async () => {
@@ -56,38 +58,37 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
     const pct = Math.min(Math.round((value / max) * 100), 100);
     return `
       <div>
-        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; color:#8F867E;" class="mwp-body"><span>${label}</span><span>${Math.round(value)}/${max}g</span></div>
-        <div style="height:4px; background:rgba(0,0,0,0.08); border-radius:2px;"><div style="width:${pct}%; height:100%; background:#8F867E; border-radius:2px;"></div></div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; color:var(--latte);" class="mwp-body"><span>${label}</span><span>${Math.round(value)}/${max}g</span></div>
+        <div style="height:4px; background:var(--creme); border-radius:2px;"><div style="width:${pct}%; height:100%; background:var(--ink); border-radius:2px;"></div></div>
       </div>`;
   }
 
   function mealRow(type) {
     const done = loggedMealTypes.has(type);
     return `
-      <a href="log-meal.html?type=${type}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:13px 14px;">
-        <i class="ti ${MEAL_ICONS[type]}" style="font-size:18px; color:#8F867E;" aria-hidden="true"></i>
+      <a href="log-meal.html?type=${type}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:var(--chai); border-radius:12px; padding:13px 14px;">
+        <i class="ti ${MEAL_ICONS[type]}" style="font-size:18px; color:var(--ink);" aria-hidden="true"></i>
         <div style="flex:1;">
-          <p class="mwp-title" style="font-size:13px; margin:0; color:#8F867E; text-transform:uppercase;">${MEAL_LABELS[type]}</p>
+          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${MEAL_LABELS[type]}</p>
         </div>
         ${done
-          ? '<i class="ti ti-check" style="font-size:17px; color:#8F867E;" aria-hidden="true"></i>'
-          : '<div style="width:15px; height:15px; border-radius:50%; border:1.5px solid #C4BEB4;"></div>'}
+          ? '<i class="ti ti-check" style="font-size:17px; color:var(--ink);" aria-hidden="true"></i>'
+          : '<div style="width:15px; height:15px; border-radius:50%; border:1.5px solid var(--creme);"></div>'}
       </a>`;
   }
 
   document.getElementById('card').innerHTML = `
-    <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Today</p>
-    <p class="mwp-title" style="font-size:26px; margin:0 0 1.3rem; color:#8F867E; text-transform:uppercase;">Nutrition</p>
+    <div id="headerSlot"></div>
 
     <div style="display:flex; align-items:center; gap:1.1rem; margin-bottom:1.3rem;">
       <div style="position:relative; width:82px; height:82px; flex-shrink:0;">
         <svg viewBox="0 0 72 72" style="width:82px; height:82px; transform:rotate(-90deg);">
-          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="6"/>
-          <circle cx="36" cy="36" r="30" fill="none" stroke="#8F867E" stroke-width="6" stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round"/>
+          <circle cx="36" cy="36" r="30" fill="none" stroke="var(--creme)" stroke-width="6"/>
+          <circle cx="36" cy="36" r="30" fill="none" stroke="var(--ink)" stroke-width="6" stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round"/>
         </svg>
         <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-          <span class="mwp-title" style="font-size:15px; color:#8F867E;">${totals.calories}</span>
-          <span class="mwp-body" style="font-size:9px; color:#8F867E;">/ ${target.calories}</span>
+          <span class="mwp-title" style="font-size:16px; color:var(--ink);">${totals.calories}</span>
+          <span class="mwp-body" style="font-size:9px; color:var(--latte);">/ ${target.calories}</span>
         </div>
       </div>
       <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
@@ -97,7 +98,7 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
       </div>
     </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Meals</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 9px;">Meals</p>
     <div style="display:flex; flex-direction:column; gap:8px;">
       ${MEAL_ORDER.map(mealRow).join('')}
     </div>
@@ -105,6 +106,7 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
     <div data-bottom-nav></div>
   `;
 
+  renderHeader(document.getElementById('headerSlot'), { userId, title: 'Nutrition' });
   renderBottomNav('nutrition');
 })();
 </script>

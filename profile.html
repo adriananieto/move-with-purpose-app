@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose · Profile</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png" />
+<link rel="icon" href="assets/mova-app-icon.png" />
+<title>MOVA · Profile</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
@@ -32,41 +34,79 @@ function weeksSince(dateStr) {
   return Math.max(1, Math.floor(ms / (7 * 24 * 60 * 60 * 1000)));
 }
 
+function normalize(values) {
+  const nums = values.filter((v) => v !== null).map(Number);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const range = max - min || 1;
+  return values.map((v) => (v === null ? null : (1 - (Number(v) - min) / range)));
+}
+
+function seriesToPoints(values, stepX) {
+  const norm = normalize(values);
+  return norm.map((v, i) => {
+    if (v === null) return null;
+    const x = 10 + i * stepX;
+    const y = 15 + v * 45;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+}
+
+function polylines(points) {
+  // Break the line at any null (missing) values instead of connecting across gaps.
+  const segments = [];
+  let current = [];
+  points.forEach((p) => {
+    if (p === null) {
+      if (current.length) segments.push(current);
+      current = [];
+    } else {
+      current.push(p);
+    }
+  });
+  if (current.length) segments.push(current);
+  return segments;
+}
+
 function weightChart(logs) {
   if (logs.length < 2) {
-    return '<p class="mwp-body" style="font-size:12.5px; color:#8F867E; opacity:0.7; text-align:center; padding:22px 0;">Log your weight during a check-in to see your progress here.</p>';
+    return '<p class="mwp-body" style="font-size:12.5px; color:var(--latte); text-align:center; padding:22px 0;">Log your weight during a check-in to see your progress here.</p>';
   }
-  const values = logs.map((l) => Number(l.weight_lb));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const stepX = 260 / (values.length - 1);
-  const points = values.map((v, i) => {
-    const x = 10 + i * stepX;
-    const y = 20 + (1 - (v - min) / range) * 50;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const last = points.split(' ').slice(-1)[0].split(',');
+  const stepX = 260 / (logs.length - 1);
+  const weightPts = seriesToPoints(logs.map((l) => l.weight_lb), stepX);
+  const fatPts = seriesToPoints(logs.map((l) => l.body_fat_pct), stepX);
+  const musclePts = seriesToPoints(logs.map((l) => l.muscle_mass_lb), stepX);
+
+  const line = (pts, dash, width) => polylines(pts).map((seg) =>
+    `<polyline points="${seg.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" ${dash ? `stroke-dasharray="${dash}"` : ''}/>`
+  ).join('');
+
   return `
-    <svg viewBox="0 0 280 90" style="width:100%; height:90px;">
-      <polyline points="${points}" fill="none" stroke="#8F867E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="#8F867E"/>
+    <svg viewBox="0 0 280 60" style="width:100%; height:60px;">
+      ${line(musclePts, '5,2.5', 1.6)}
+      ${line(fatPts, '2,2', 1.6)}
+      ${line(weightPts, null, 2.5)}
     </svg>
-    <div style="display:flex; justify-content:space-between; font-size:11px; color:#8F867E; margin-top:5px;" class="mwp-body">
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--latte); margin:5px 0 12px;" class="mwp-body">
       <span>${logs[0].logged_at}</span><span>${logs[logs.length - 1].logged_at}</span>
+    </div>
+    <div style="display:flex; gap:14px; flex-wrap:wrap;">
+      <span class="mwp-body" style="font-size:10.5px; color:var(--ink); display:flex; align-items:center; gap:5px;"><span style="width:12px; height:2.5px; background:var(--ink); display:inline-block;"></span>Weight</span>
+      <span class="mwp-body" style="font-size:10.5px; color:var(--ink); display:flex; align-items:center; gap:5px;"><span style="width:12px; height:1.6px; background:repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 6px); display:inline-block;"></span>Body Fat</span>
+      <span class="mwp-body" style="font-size:10.5px; color:var(--ink); display:flex; align-items:center; gap:5px;"><span style="width:12px; height:1.6px; background:repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 6px); display:inline-block;"></span>Muscle Mass</span>
     </div>`;
 }
 
 function photoTile(photo) {
   const url = sb.storage.from('photos').getPublicUrl(photo.storage_path).data.publicUrl;
-  return `<div style="aspect-ratio:3/4; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; overflow:hidden;"><img src="${url}" alt="Progress photo" style="width:100%; height:100%; object-fit:cover;" /></div>`;
+  return `<div style="aspect-ratio:3/4; background:var(--chai); border-radius:10px; overflow:hidden;"><img src="${url}" alt="Progress photo" style="width:100%; height:100%; object-fit:cover;" /></div>`;
 }
 
 function statTile(value, label) {
   return `
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:11px; padding:12px; text-align:center;">
-      <p class="mwp-title" style="font-size:16px; margin:0; color:#8F867E;">${value}</p>
-      <p class="mwp-body" style="font-size:10px; color:#8F867E; margin:3px 0 0; text-transform:uppercase;">${label}</p>
+    <div style="background:var(--chai); border-radius:11px; padding:12px; text-align:center;">
+      <p class="mwp-title" style="font-size:16px; margin:0; color:var(--ink);">${value}</p>
+      <p class="mwp-label" style="font-size:9px; color:var(--latte); margin:3px 0 0;">${label}</p>
     </div>`;
 }
 
@@ -87,43 +127,42 @@ async function loadAndRender() {
   const memberSince = new Date(profile.member_since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const latestBodyFat = [...weightLogs].reverse().find((l) => l.body_fat_pct !== null);
-  const latestMuscle = [...weightLogs].reverse().find((l) => l.muscle_mass_pct !== null);
-  const showBodyComp = !!latestBodyFat || !!latestMuscle;
+  const latestMuscle = [...weightLogs].reverse().find((l) => l.muscle_mass_lb !== null);
 
   document.getElementById('card').innerHTML = `
+    <div id="headerSlot"></div>
+
     <div style="display:flex; align-items:center; gap:14px; margin-bottom:1.3rem;">
-      <div style="width:56px; height:56px; border-radius:50%; background:#8F867E; display:flex; align-items:center; justify-content:center;">
-        <span class="mwp-title" style="font-size:17px; color:#FFFFFF;">${initials(profile.full_name)}</span>
+      <div style="width:56px; height:56px; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center;">
+        <span class="mwp-title" style="font-size:17px; color:var(--froth);">${initials(profile.full_name)}</span>
       </div>
       <div style="flex:1;">
-        <p class="mwp-title" style="font-size:17px; margin:0; color:#8F867E; text-transform:uppercase;">${profile.full_name}</p>
-        <p class="mwp-body" style="font-size:11.5px; color:#8F867E; margin:0; opacity:0.75;">Member since ${memberSince}</p>
+        <p class="mwp-title" style="font-size:17px; margin:0; color:var(--ink);">${profile.full_name}</p>
+        <p class="mwp-body" style="font-size:11.5px; color:var(--latte); margin:0;">Member since ${memberSince}</p>
       </div>
-      <span class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:0.5px; background:#8F867E; color:#FFFFFF; padding:6px 11px; border-radius:6px; text-transform:uppercase;">${profile.plan_tier}</span>
+      <span class="mwp-label" style="font-size:9px; background:var(--ink); color:var(--froth); padding:6px 11px; border-radius:6px;">${profile.plan_tier}</span>
     </div>
 
-    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:9px; margin-bottom:${showBodyComp ? '9px' : '1.3rem'};">
-      ${statTile(current !== null ? current + ' lb' : '—', 'Current')}
-      ${statTile(change !== null ? (change > 0 ? '+' : '') + change + ' lb' : '—', 'Since start')}
-      ${statTile(weeksSince(profile.member_since), 'Weeks')}
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:9px; margin-bottom:9px;">
+      ${statTile(current !== null ? current + ' lb' : '—', 'Weight')}
+      ${statTile(latestBodyFat ? latestBodyFat.body_fat_pct + '%' : '—', 'Body Fat')}
+      ${statTile(latestMuscle ? latestMuscle.muscle_mass_lb + ' lb' : '—', 'Muscle Mass')}
     </div>
 
-    ${showBodyComp ? `
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:9px; margin-bottom:1.3rem;">
-        ${statTile(latestBodyFat ? latestBodyFat.body_fat_pct + '%' : '—', 'Body Fat')}
-        ${statTile(latestMuscle ? latestMuscle.muscle_mass_pct + '%' : '—', 'Muscle Mass')}
-      </div>
-    ` : ''}
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:9px; margin-bottom:1.3rem;">
+      ${statTile(weeksSince(profile.member_since), 'Total Weeks')}
+      ${statTile(change !== null ? (change > 0 ? '+' : '') + change + ' lb' : '—', 'Change Since Start')}
+    </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Body Weight</p>
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:16px; margin-bottom:1.3rem;">
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 9px;">Body Composition</p>
+    <div style="background:var(--chai); border-radius:12px; padding:16px; margin-bottom:1.3rem;">
       ${weightChart(weightLogs)}
     </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Progress Photos</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 9px;">Progress Photos</p>
     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:9px; margin-bottom:0.5rem;">
       ${photos.map(photoTile).join('')}
-      <label for="photoInput" style="cursor:pointer; aspect-ratio:3/4; background:#8F867E; border-radius:10px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-plus" style="font-size:19px; color:#FFFFFF;" aria-hidden="true"></i></label>
+      <label for="photoInput" style="cursor:pointer; aspect-ratio:3/4; background:var(--ink); border-radius:10px; display:flex; align-items:center; justify-content:center;"><i class="ti ti-plus" style="font-size:19px; color:var(--froth);" aria-hidden="true"></i></label>
     </div>
     <input type="file" id="photoInput" accept="image/*" style="display:none;" />
     <p id="photoError" class="mwp-error" style="display:none;"></p>
@@ -131,6 +170,7 @@ async function loadAndRender() {
     <div data-bottom-nav></div>
   `;
 
+  renderHeader(document.getElementById('headerSlot'), { userId, title: 'Profile' });
   renderBottomNav('profile');
 
   document.getElementById('photoInput').addEventListener('change', async (e) => {
