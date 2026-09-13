@@ -32,9 +32,9 @@ async function renderHeader(container, { title, userId } = {}) {
   container.innerHTML = `
     <div class="mwp-header">
       <div class="mwp-logo">${MOVA_WORDMARK_SVG}</div>
-      ${dayWeekHtml}
-      ${title ? `<p class="mwp-section-title">${title}</p>` : ''}
-    </div>`;
+    </div>
+    ${dayWeekHtml}
+    ${title ? `<p class="mwp-section-title">${title}</p>` : ''}`;
 }
 
 function renderBottomNav(active) {
@@ -45,12 +45,12 @@ function renderBottomNav(active) {
     { key: 'profile', href: 'profile.html', icon: 'ti-chart-line' },
   ];
   const html = items.map((item) => {
-    const color = item.key === active ? 'var(--ink)' : 'var(--latte)';
+    const color = item.key === active ? 'var(--creme)' : 'var(--latte)';
     return `<a href="${item.href}" style="color:${color}; text-decoration:none; line-height:0;"><i class="ti ${item.icon}" style="font-size:22px;" aria-hidden="true"></i></a>`;
   }).join('');
 
   document.querySelectorAll('[data-bottom-nav]').forEach((el) => {
     el.innerHTML = html;
-    el.style.cssText = 'display:flex; justify-content:space-around; border-top:0.5px solid rgba(0,0,0,0.1); padding-top:14px; margin-top:1.3rem;';
+    el.style.cssText = 'display:flex; justify-content:space-around; border-top:0.5px solid rgba(160,144,134,0.3); padding-top:14px; margin-top:1.3rem;';
   });
 }

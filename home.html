@@ -76,22 +76,22 @@
     <div id="headerSlot"></div>
 
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 1.6rem;">
-      <p class="mwp-title" style="font-size:26px; margin:0; color:var(--ink);">Hello, ${firstName}!</p>
-      <button id="logoutBtn" style="width:38px; height:38px; border-radius:50%; background:var(--chai); border:none; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;"><i class="ti ti-logout" style="font-size:18px; color:var(--ink);" aria-hidden="true"></i></button>
+      <p class="mwp-title" style="font-size:26px; margin:0; color:var(--creme);">Hello, ${firstName}!</p>
+      <button id="logoutBtn" style="width:38px; height:38px; border-radius:50%; background:var(--creme); border:none; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;"><i class="ti ti-logout" style="font-size:18px; color:var(--ink);" aria-hidden="true"></i></button>
     </div>
 
-    <div style="background:var(--ink); border-radius:14px; padding:1.3rem 1.2rem; margin-bottom:1rem;">
-      <p class="mwp-label" style="font-size:10px; color:var(--froth); margin:0 0 7px;">Weekly Progress</p>
-      <p class="mwp-title" style="font-size:26px; margin:0; color:var(--froth);">${sessionsDone} / ${workoutTarget} sessions</p>
+    <div style="background:var(--latte); border-radius:14px; padding:1.3rem 1.2rem; margin-bottom:1rem;">
+      <p class="mwp-label" style="font-size:10px; color:var(--ink); margin:0 0 7px;">Weekly Progress</p>
+      <p class="mwp-title" style="font-size:26px; margin:0; color:var(--ink);">${sessionsDone} / ${workoutTarget} sessions</p>
     </div>
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:1.2rem;">
-      <a href="workout.html" style="text-decoration:none; background:var(--chai); border-radius:12px; padding:14px; display:block;">
+      <a href="workout.html" style="text-decoration:none; background:var(--creme); border-radius:12px; padding:14px; display:block;">
         <i class="ti ti-barbell" style="font-size:20px; color:var(--ink);" aria-hidden="true"></i>
         <p class="mwp-title" style="font-size:14px; margin:10px 0 3px; color:var(--ink);">Training</p>
         <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:0;">${todaysDay ? todaysDay.name : 'No program yet'}</p>
       </a>
-      <a href="nutrition.html" style="text-decoration:none; background:var(--chai); border-radius:12px; padding:14px; display:block;">
+      <a href="nutrition.html" style="text-decoration:none; background:var(--creme); border-radius:12px; padding:14px; display:block;">
         <i class="ti ti-apple" style="font-size:20px; color:var(--ink);" aria-hidden="true"></i>
         <p class="mwp-title" style="font-size:14px; margin:10px 0 3px; color:var(--ink);">Nutrition</p>
         <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:0;">${caloriesToday} / ${caloriesTarget} kcal</p>

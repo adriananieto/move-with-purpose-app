@@ -17,12 +17,12 @@
 <div class="mwp-card">
   <div class="mwp-header">
     <div class="mwp-logo" id="logoSlot"></div>
-    <p class="mwp-label mwp-daylabel">Move With Purpose</p>
   </div>
+  <p class="mwp-label" style="font-size:10px; color:var(--creme); text-align:center; margin:0 0 1.3rem;">Move With Purpose</p>
 
   <div style="display:flex; gap:7px; margin-bottom:1.3rem;">
-    <button id="tabLogin" class="mwp-label" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--ink); color:var(--froth); font-size:12px; cursor:pointer;">Log in</button>
-    <button id="tabSignup" class="mwp-label" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--chai); color:var(--ink); font-size:12px; cursor:pointer;">Sign up</button>
+    <button id="tabLogin" class="mwp-label" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--latte); color:var(--ink); font-size:12px; cursor:pointer;">Log in</button>
+    <button id="tabSignup" class="mwp-label" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--creme); color:var(--ink); font-size:12px; cursor:pointer;">Sign up</button>
   </div>
 
   <p id="formError" class="mwp-error" style="display:none;"></p>
@@ -40,6 +40,7 @@
     </div>
     <button type="submit" id="submitBtn" class="mwp-btn">Log in</button>
   </form>
+  <button id="forgotBtn" class="mwp-btn-link" style="display:block; margin:14px auto 0;">Forgot password?</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -59,10 +60,10 @@ const formNotice = document.getElementById('formNotice');
 function setMode(next) {
   mode = next;
   const isLogin = mode === 'login';
-  tabLogin.style.background = isLogin ? 'var(--ink)' : 'var(--chai)';
-  tabLogin.style.color = isLogin ? 'var(--froth)' : 'var(--ink)';
-  tabSignup.style.background = isLogin ? 'var(--chai)' : 'var(--ink)';
-  tabSignup.style.color = isLogin ? 'var(--ink)' : 'var(--froth)';
+  tabLogin.style.background = isLogin ? 'var(--latte)' : 'var(--creme)';
+  tabLogin.style.color = 'var(--ink)';
+  tabSignup.style.background = isLogin ? 'var(--creme)' : 'var(--latte)';
+  tabSignup.style.color = 'var(--ink)';
   nameField.style.display = isLogin ? 'none' : 'block';
   submitBtn.textContent = isLogin ? 'Log in' : 'Sign up';
   formError.style.display = 'none';
@@ -107,6 +108,34 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     formError.style.display = 'block';
   } finally {
     submitBtn.disabled = false;
+  }
+});
+
+document.getElementById('forgotBtn').addEventListener('click', async () => {
+  formError.style.display = 'none';
+  formNotice.style.display = 'none';
+
+  const email = document.getElementById('email').value.trim();
+  if (!email) {
+    formError.textContent = 'Enter your email above first, then tap "Forgot password?".';
+    formError.style.display = 'block';
+    return;
+  }
+
+  const forgotBtn = document.getElementById('forgotBtn');
+  forgotBtn.disabled = true;
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: new URL('reset-password.html', window.location.href).href,
+    });
+    if (error) throw error;
+    formNotice.textContent = 'If that email has an account, a reset link is on its way.';
+    formNotice.style.display = 'block';
+  } catch (err) {
+    formError.textContent = err.message || 'Something went wrong. Please try again.';
+    formError.style.display = 'block';
+  } finally {
+    forgotBtn.disabled = false;
   }
 });
 

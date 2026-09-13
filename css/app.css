@@ -19,7 +19,7 @@ body {
   margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--froth);
+  background: var(--ink);
   font-family: 'Poppins', sans-serif;
   overscroll-behavior-y: none;
 }
@@ -30,7 +30,7 @@ body {
 
 .mwp-card {
   position: relative;
-  background: var(--froth);
+  background: var(--ink);
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
   background-repeat: repeat;
@@ -57,9 +57,9 @@ body {
   }
 }
 
-.mwp-header { text-align: center; margin-bottom: 1.3rem; }
+.mwp-header { text-align: center; margin-bottom: 1.15rem; }
 .mwp-logo {
-  color: var(--ink);
+  color: var(--creme);
   width: 78px;
   margin: 0 auto;
   line-height: 0;
@@ -67,24 +67,26 @@ body {
 .mwp-logo svg { display: block; width: 100%; height: auto; }
 .mwp-daylabel {
   font-size: 10px;
-  color: var(--latte);
-  margin: 8px 0 0;
+  color: var(--creme);
+  text-align: left;
+  margin: 0 0 4px;
 }
 .mwp-section-title {
   font-family: 'Poppins', sans-serif;
   font-weight: 300;
   font-size: 22px;
-  color: var(--ink);
-  margin: 4px 0 0;
+  color: var(--creme);
+  text-align: left;
+  margin: 0 0 1.3rem;
 }
 
 .mwp-input, .mwp-select, .mwp-textarea {
   width: 100%;
-  border: 0.5px solid rgba(0,0,0,0.1);
+  border: none;
   border-radius: 8px;
   font-family: 'Poppins', sans-serif;
   color: var(--ink);
-  background: var(--chai);
+  background: var(--creme);
   padding: 12px 14px;
   font-size: 16px;
 }
@@ -93,8 +95,8 @@ body {
 
 .mwp-btn {
   width: 100%;
-  background: var(--ink);
-  color: var(--froth);
+  background: var(--latte);
+  color: var(--ink);
   border: none;
   font-size: 14px;
   padding: 15px;
@@ -120,7 +122,7 @@ body {
 }
 
 .mwp-error {
-  color: var(--ink);
+  color: var(--creme);
   font-weight: 600;
   font-size: 12.5px;
   font-family: 'Poppins', sans-serif;

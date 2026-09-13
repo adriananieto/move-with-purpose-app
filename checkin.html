@@ -12,8 +12,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
 <link rel="stylesheet" href="css/app.css?v=4" />
 <style>
-.scale-btn { flex:1; background:var(--chai); border:none; border-radius:6px; padding:9px 0; font-size:13px; font-family:'Poppins',sans-serif; color:var(--ink); text-align:center; cursor:pointer; }
-.scale-btn.active { background:var(--ink); color:var(--froth); }
+.scale-btn { flex:1; background:var(--creme); border:none; border-radius:6px; padding:9px 0; font-size:13px; font-family:'Poppins',sans-serif; color:var(--ink); text-align:center; cursor:pointer; }
+.scale-btn.active { background:var(--latte); color:var(--ink); }
 </style>
 </head>
 <body>
@@ -36,36 +36,40 @@ function scaleRow(field, label) {
     `<div class="scale-btn ${state[field] === n ? 'active' : ''}" data-field="${field}" data-value="${n}">${n}</div>`
   ).join('');
   return `
-    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">${label}</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 7px;">${label}</p>
     <div style="display:flex; gap:6px; margin-bottom:1rem;">${btns}</div>`;
 }
 
 function render() {
   document.getElementById('card').innerHTML = `
     <div id="headerSlot"></div>
+    <a href="home.html" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; margin-bottom:1rem;">
+      <i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>
+      <span class="mwp-body" style="font-size:12px; color:var(--latte);">Home</span>
+    </a>
 
-    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">Fasting weight</p>
-    <div style="background:var(--chai); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:8px; margin-bottom:0.9rem; height:46px;">
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 7px;">Fasting weight</p>
+    <div style="background:var(--creme); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:8px; margin-bottom:0.9rem; height:46px;">
       <input type="number" id="weightInput" value="${state.weight}" style="flex:1; border:none; background:transparent; font-size:16px; font-weight:600; color:var(--ink); font-family:'Poppins',sans-serif;" aria-label="Fasting weight" />
       <span class="mwp-body" style="font-size:12px; color:var(--latte);">lb</span>
     </div>
 
-    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">Body composition (optional)</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 7px;">Body composition (optional)</p>
     <div style="display:flex; gap:8px; margin-bottom:1rem;">
-      <div style="flex:1; background:var(--chai); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
+      <div style="flex:1; background:var(--creme); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
         <input type="number" id="bodyFatInput" value="${state.bodyFat}" placeholder="—" style="flex:1; width:0; border:none; background:transparent; font-size:16px; font-weight:600; color:var(--ink); font-family:'Poppins',sans-serif;" aria-label="Body fat percent" />
         <span class="mwp-body" style="font-size:11px; color:var(--latte);">% fat</span>
       </div>
-      <div style="flex:1; background:var(--chai); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
+      <div style="flex:1; background:var(--creme); border-radius:10px; padding:0 14px; display:flex; align-items:center; gap:6px; height:46px;">
         <input type="number" id="muscleMassInput" value="${state.muscleMass}" placeholder="—" style="flex:1; width:0; border:none; background:transparent; font-size:16px; font-weight:600; color:var(--ink); font-family:'Poppins',sans-serif;" aria-label="Muscle mass in pounds" />
         <span class="mwp-body" style="font-size:11px; color:var(--latte);">lb muscle</span>
       </div>
     </div>
 
-    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">Photos</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 7px;">Photos</p>
     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:1rem;">
       ${[0, 1, 2].map((i) => `
-        <label for="photo${i}" style="cursor:pointer; aspect-ratio:3/4; background:var(--chai); border:1.5px dashed var(--creme); border-radius:9px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        <label for="photo${i}" style="cursor:pointer; aspect-ratio:3/4; background:var(--creme); border:1.5px dashed var(--latte); border-radius:9px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
           ${photoFiles[i] ? `<span class="mwp-body" style="font-size:10px; color:var(--ink); padding:4px; text-align:center;">${photoFiles[i].name}</span>` : '<i class="ti ti-camera" style="font-size:16px; color:var(--latte);" aria-hidden="true"></i>'}
         </label>
         <input type="file" id="photo${i}" accept="image/*" style="display:none;" />
@@ -77,7 +81,7 @@ function render() {
     ${scaleRow('adherence', 'Plan adherence')}
     ${scaleRow('stress', 'Stress / sleep quality')}
 
-    <p class="mwp-label" style="font-size:11px; color:var(--ink); margin:0 0 7px;">General feedback</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 7px;">General feedback</p>
     <textarea id="feedbackInput" placeholder="How did this week feel? Any questions or adjustments needed..." class="mwp-textarea" style="height:64px; margin-bottom:1.3rem;">${state.feedback}</textarea>
 
     <p id="submitError" class="mwp-error" style="display:none;"></p>

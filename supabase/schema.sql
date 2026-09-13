@@ -228,8 +228,12 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', 'New Member'));
+  insert into public.profiles (id, full_name, plan_tier)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', 'New Member'),
+    coalesce(new.raw_user_meta_data->>'plan_tier', 'Premium')
+  );
 
   insert into public.nutrition_targets (user_id) values (new.id);
 

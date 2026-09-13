@@ -69,8 +69,8 @@
         const { done, total } = dayStatus(d);
         const complete = total > 0 && done === total;
         return `
-        <a href="workout-day.html?day=${d.id}" style="text-decoration:none; display:flex; align-items:center; gap:13px; background:var(--chai); border-radius:14px; padding:16px;">
-          <i class="ti ${complete ? 'ti-square-rounded-check-filled' : 'ti-square-rounded'}" style="font-size:26px; color:${complete ? 'var(--ink)' : 'var(--creme)'}; flex-shrink:0;" aria-hidden="true"></i>
+        <a href="workout-day.html?day=${d.id}" style="text-decoration:none; display:flex; align-items:center; gap:13px; background:var(--creme); border-radius:14px; padding:16px;">
+          <i class="ti ${complete ? 'ti-square-rounded-check-filled' : 'ti-square-rounded'}" style="font-size:26px; color:${complete ? 'var(--ink)' : 'var(--latte)'}; flex-shrink:0;" aria-hidden="true"></i>
           <div style="flex:1;">
             <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">Day ${d.day_number} · ${d.name}</p>
             <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${total} exercise${total === 1 ? '' : 's'}${total ? ` · ${done}/${total} done today` : ''}</p>
