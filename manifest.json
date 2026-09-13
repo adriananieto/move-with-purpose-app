@@ -1,0 +1,19 @@
+{
+  "name": "MOVA",
+  "short_name": "MOVA",
+  "description": "Move With Purpose — MOVA client training app",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#211E1B",
+  "theme_color": "#211E1B",
+  "icons": [
+    {
+      "src": "assets/mova-app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
