@@ -39,10 +39,10 @@
   monday.setHours(0, 0, 0, 0);
   const mondayStr = monday.toISOString().slice(0, 10);
 
-  const [profileRes, daysRes, exerciseLogsRes, nutritionTargetRes, mealLogsRes] = await Promise.all([
+  const [profileRes, workoutsRes, exerciseLogsRes, nutritionTargetRes, mealLogsRes] = await Promise.all([
     sb.from('profiles').select('full_name, phase_start_date').eq('id', userId).single(),
-    sb.from('workout_days').select('id, day_number, name, workout_sections(id, exercises(id, target_sets))').order('day_number'),
-    sb.from('exercise_logs').select('exercise_id, set_number, logged_at').eq('user_id', userId).gte('logged_at', mondayStr),
+    sb.from('workouts').select('id, name, workout_exercises(id, sets)').eq('client_id', userId).order('name'),
+    sb.from('exercise_logs').select('workout_exercise_id, set_number, logged_at').eq('user_id', userId).gte('logged_at', mondayStr).not('workout_exercise_id', 'is', null),
     sb.from('nutrition_targets').select('calories').eq('user_id', userId).single(),
     sb.from('meal_logs').select('total_calories').eq('user_id', userId).eq('logged_at', todayStr),
   ]);
@@ -55,21 +55,18 @@
   const daysTrained = new Set(weekLogs.map((l) => l.logged_at.slice(0, 10))).size;
   const sessionsDone = Math.min(daysTrained, workoutTarget);
 
-  const days = daysRes.data || [];
-  const setsLoggedByExercise = {};
-  weekLogs
-    .filter((l) => l.logged_at.slice(0, 10) === todayStr)
-    .forEach((l) => {
-      setsLoggedByExercise[l.exercise_id] = Math.max(setsLoggedByExercise[l.exercise_id] || 0, l.set_number);
-    });
+  const workouts = workoutsRes.data || [];
+  const setsLoggedByWE = {};
+  weekLogs.forEach((l) => {
+    setsLoggedByWE[l.workout_exercise_id] = Math.max(setsLoggedByWE[l.workout_exercise_id] || 0, l.set_number);
+  });
 
-  function dayIsComplete(d) {
-    const exercises = d.workout_sections.flatMap((s) => s.exercises);
-    if (!exercises.length) return false;
-    return exercises.every((e) => (setsLoggedByExercise[e.id] || 0) >= e.target_sets);
+  function workoutIsComplete(w) {
+    if (!w.workout_exercises.length) return false;
+    return w.workout_exercises.every((we) => (setsLoggedByWE[we.id] || 0) >= we.sets);
   }
 
-  const todaysDay = days.find((d) => !dayIsComplete(d)) || days[0] || null;
+  const todaysDay = workouts.find((w) => !workoutIsComplete(w)) || workouts[0] || null;
 
   const caloriesTarget = nutritionTargetRes.data?.calories || 1800;
   const caloriesToday = (mealLogsRes.data || []).reduce((sum, m) => sum + (m.total_calories || 0), 0);
@@ -101,7 +98,7 @@
     </div>
 
     ${todaysDay ? `
-      <a href="workout-day.html?day=${todaysDay.id}" class="mwp-btn" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box; margin-bottom:0.9rem;">Start Today's Session</a>
+      <a href="workout-day.html?workout=${todaysDay.id}" class="mwp-btn" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box; margin-bottom:0.9rem;">Start Today's Session</a>
     ` : ''}
 
     <a href="checkin.html" style="text-decoration:none; display:block; text-align:center; padding:8px; margin-bottom:1.2rem;">

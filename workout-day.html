@@ -25,57 +25,74 @@
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
 <script>
+// target_reps rows are tagged "[Section] detail" (e.g. "[Warm Up] 10 min, pace moderado")
+// since there's no dedicated section column yet. Parse that tag back out for display/grouping.
+function parseTargetReps(targetReps) {
+  const m = /^\[(.+?)\]\s*(.*)$/.exec(targetReps || '');
+  return m ? { section: m[1], detail: m[2] } : { section: 'Workout', detail: targetReps || '' };
+}
+
 (async () => {
   const session = await requireSession();
   if (!session) return;
   const userId = session.user.id;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const dayId = new URLSearchParams(window.location.search).get('day');
+  const workoutId = new URLSearchParams(window.location.search).get('workout');
   const card = document.getElementById('card');
 
-  const { data: day, error } = await sb
-    .from('workout_days')
-    .select('id, day_number, name, workout_sections(id, name, order_index, exercises(id, name, order_index, target_sets, target_reps))')
-    .eq('id', dayId)
+  const { data: workout, error } = await sb
+    .from('workouts')
+    .select('id, name, workout_exercises(id, sets, target_reps, order_index, exercises(id, name, video_url))')
+    .eq('id', workoutId)
+    .eq('client_id', userId)
     .single();
 
-  if (error || !day) {
-    card.innerHTML = '<p class="mwp-loading">Workout day not found.</p>';
+  if (error || !workout) {
+    card.innerHTML = '<p class="mwp-loading">Workout not found.</p>';
     return;
   }
 
   const { data: todayLogs } = await sb
     .from('exercise_logs')
-    .select('exercise_id, set_number')
+    .select('workout_exercise_id, set_number')
     .eq('user_id', userId)
-    .gte('logged_at', todayStr + 'T00:00:00');
+    .not('workout_exercise_id', 'is', null);
 
-  const setsLoggedByExercise = {};
+  const setsLoggedByWE = {};
   (todayLogs || []).forEach((l) => {
-    setsLoggedByExercise[l.exercise_id] = Math.max(setsLoggedByExercise[l.exercise_id] || 0, l.set_number);
+    setsLoggedByWE[l.workout_exercise_id] = Math.max(setsLoggedByWE[l.workout_exercise_id] || 0, l.set_number);
   });
 
-  const sections = [...day.workout_sections].sort((a, b) => a.order_index - b.order_index);
-  const allExercises = sections.flatMap((s) => s.exercises);
-  const isCardio = (sec) => sec.name.toLowerCase() === 'cardio';
-  const exercisesDone = allExercises.filter((e) => (setsLoggedByExercise[e.id] || 0) >= e.target_sets).length;
+  const items = [...workout.workout_exercises]
+    .sort((a, b) => a.order_index - b.order_index)
+    .map((we) => ({ ...we, ...parseTargetReps(we.target_reps) }));
 
-  function exerciseRow(ex, cardio) {
-    const setsDone = setsLoggedByExercise[ex.id] || 0;
-    const complete = setsDone >= ex.target_sets;
-    const detail = cardio
-      ? `${ex.target_reps} min`
-      : `${ex.target_sets} sets × ${ex.target_reps} reps`;
+  const sectionOrder = ['Warm Up', 'Workout', 'Core', 'Cardio'];
+  const sections = sectionOrder
+    .map((name) => ({ name, items: items.filter((it) => it.section === name) }))
+    .filter((s) => s.items.length);
+  // Catch any section name that doesn't match the known set, appended at the end.
+  const knownNames = new Set(sectionOrder);
+  const extraSections = [...new Set(items.filter((it) => !knownNames.has(it.section)).map((it) => it.section))]
+    .map((name) => ({ name, items: items.filter((it) => it.section === name) }));
+  const allSections = [...sections, ...extraSections];
+
+  const exercisesDone = items.filter((it) => (setsLoggedByWE[it.id] || 0) >= it.sets).length;
+
+  function exerciseRow(it) {
+    const setsDone = setsLoggedByWE[it.id] || 0;
+    const complete = setsDone >= it.sets;
+    const isCardio = it.section === 'Cardio' || it.section === 'Warm Up';
+    const detail = isCardio ? it.detail : `${it.sets} sets × ${it.detail}`;
     return `
-      <a href="workout-exercise.html?exercise=${ex.id}&day=${day.id}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:var(--creme); border-radius:12px; padding:14px 16px;">
+      <a href="workout-exercise.html?we=${it.id}&workout=${workout.id}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:var(--creme); border-radius:12px; padding:14px 16px;">
         <i class="ti ti-video" style="font-size:17px; color:var(--latte); flex-shrink:0;" aria-hidden="true"></i>
         <div style="flex:1;">
-          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${ex.name}</p>
+          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${it.exercises.name}</p>
           <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${detail}</p>
         </div>
         ${complete
           ? '<i class="ti ti-circle-check" style="font-size:19px; color:var(--ink);" aria-hidden="true"></i>'
-          : `<span class="mwp-body" style="font-size:12px; color:var(--latte);">${setsDone}/${ex.target_sets}</span>`}
+          : `<span class="mwp-body" style="font-size:12px; color:var(--latte);">${setsDone}/${it.sets}</span>`}
       </a>`;
   }
 
@@ -86,14 +103,14 @@
       <span class="mwp-body" style="font-size:12px; color:var(--latte);">Training split</span>
     </a>
 
-    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.2rem;">Workout Progress &nbsp;·&nbsp; ${exercisesDone} / ${allExercises.length}</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.2rem;">Workout Progress &nbsp;·&nbsp; ${exercisesDone} / ${items.length}</p>
 
     <div style="display:flex; flex-direction:column; gap:18px;">
-      ${sections.map((sec) => `
+      ${allSections.map((sec) => `
         <div>
           <p class="mwp-label" style="font-size:12px; color:var(--creme); margin:0 0 8px;">${sec.name}</p>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            ${[...sec.exercises].sort((a, b) => a.order_index - b.order_index).map((ex) => exerciseRow(ex, isCardio(sec))).join('')}
+            ${sec.items.map(exerciseRow).join('')}
           </div>
         </div>
       `).join('')}
@@ -102,7 +119,7 @@
     <div data-bottom-nav></div>
   `;
 
-  renderHeader(document.getElementById('headerSlot'), { userId, title: day.name });
+  renderHeader(document.getElementById('headerSlot'), { userId, title: workout.name });
   renderBottomNav('workout');
 })();
 </script>

@@ -29,37 +29,35 @@
   const session = await requireSession();
   if (!session) return;
   const userId = session.user.id;
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const { data: days, error } = await sb
-    .from('workout_days')
-    .select('id, day_number, name, workout_sections(id, exercises(id, target_sets))')
-    .order('day_number');
-
   const card = document.getElementById('card');
 
-  if (error || !days || !days.length) {
+  const { data: workouts, error } = await sb
+    .from('workouts')
+    .select('id, name, workout_exercises(id, sets)')
+    .eq('client_id', userId)
+    .order('name');
+
+  if (error || !workouts || !workouts.length) {
     card.innerHTML = '<div id="headerSlot"></div><p class="mwp-loading">No workout program assigned yet.</p>';
     renderHeader(document.getElementById('headerSlot'), { userId, title: 'Training Split' });
     return;
   }
 
-  const { data: todayLogs } = await sb
+  const { data: logs } = await sb
     .from('exercise_logs')
-    .select('exercise_id, set_number')
+    .select('workout_exercise_id, set_number')
     .eq('user_id', userId)
-    .gte('logged_at', todayStr + 'T00:00:00');
+    .not('workout_exercise_id', 'is', null);
 
-  const setsLoggedByExercise = {};
-  (todayLogs || []).forEach((l) => {
-    setsLoggedByExercise[l.exercise_id] = Math.max(setsLoggedByExercise[l.exercise_id] || 0, l.set_number);
+  const setsLoggedByWE = {};
+  (logs || []).forEach((l) => {
+    setsLoggedByWE[l.workout_exercise_id] = Math.max(setsLoggedByWE[l.workout_exercise_id] || 0, l.set_number);
   });
 
-  function dayStatus(day) {
-    const exercises = day.workout_sections.flatMap((s) => s.exercises);
-    if (!exercises.length) return { done: 0, total: 0 };
-    const total = exercises.length;
-    const done = exercises.filter((e) => (setsLoggedByExercise[e.id] || 0) >= e.target_sets).length;
+  function workoutStatus(w) {
+    const total = w.workout_exercises.length;
+    if (!total) return { done: 0, total: 0 };
+    const done = w.workout_exercises.filter((we) => (setsLoggedByWE[we.id] || 0) >= we.sets).length;
     return { done, total };
   }
 
@@ -67,15 +65,15 @@
     <div id="headerSlot"></div>
 
     <div style="display:flex; flex-direction:column; gap:10px;">
-      ${days.map((d) => {
-        const { done, total } = dayStatus(d);
+      ${workouts.map((w) => {
+        const { done, total } = workoutStatus(w);
         const complete = total > 0 && done === total;
         return `
-        <a href="workout-day.html?day=${d.id}" style="text-decoration:none; display:flex; align-items:center; gap:13px; background:var(--creme); border-radius:14px; padding:16px;">
+        <a href="workout-day.html?workout=${w.id}" style="text-decoration:none; display:flex; align-items:center; gap:13px; background:var(--creme); border-radius:14px; padding:16px;">
           <i class="ti ${complete ? 'ti-square-rounded-check-filled' : 'ti-square-rounded'}" style="font-size:26px; color:${complete ? 'var(--ink)' : 'var(--latte)'}; flex-shrink:0;" aria-hidden="true"></i>
           <div style="flex:1;">
-            <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">Day ${d.day_number} · ${d.name}</p>
-            <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${total} exercise${total === 1 ? '' : 's'}${total ? ` · ${done}/${total} done today` : ''}</p>
+            <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">${w.name}</p>
+            <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${total} exercise${total === 1 ? '' : 's'}${total ? ` · ${done}/${total} done` : ''}</p>
           </div>
           <i class="ti ti-chevron-right" style="font-size:18px; color:var(--latte); flex-shrink:0;" aria-hidden="true"></i>
         </a>`;

@@ -25,27 +25,39 @@
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
 <script>
-let userId, dayId, dayName, orderedExercises, current, todayStr;
+let userId, workoutId, workoutName, orderedItems, current, todayStr;
 
-async function loadDay() {
-  const { data: day, error } = await sb
-    .from('workout_days')
-    .select('id, day_number, name, workout_sections(id, order_index, exercises(id, name, order_index, target_sets, target_reps, video_url))')
-    .eq('id', dayId)
+function parseTargetReps(targetReps) {
+  const m = /^\[(.+?)\]\s*(.*)$/.exec(targetReps || '');
+  return m ? { section: m[1], detail: m[2] } : { section: 'Workout', detail: targetReps || '' };
+}
+
+function parseLeadingReps(detail) {
+  const m = /^(\d+)/.exec(detail || '');
+  return m ? parseInt(m[1], 10) : null;
+}
+
+async function loadWorkout() {
+  const { data: workout, error } = await sb
+    .from('workouts')
+    .select('id, name, workout_exercises(id, sets, target_reps, order_index, exercises(id, name, video_url))')
+    .eq('id', workoutId)
+    .eq('client_id', userId)
     .single();
 
-  if (error || !day) {
-    document.getElementById('card').innerHTML = '<p class="mwp-loading">Workout day not found.</p>';
+  if (error || !workout) {
+    document.getElementById('card').innerHTML = '<p class="mwp-loading">Workout not found.</p>';
     return null;
   }
 
-  dayName = day.name;
-  const sections = [...day.workout_sections].sort((a, b) => a.order_index - b.order_index);
-  return sections.flatMap((s) => [...s.exercises].sort((a, b) => a.order_index - b.order_index));
+  workoutName = workout.name;
+  return [...workout.workout_exercises]
+    .sort((a, b) => a.order_index - b.order_index)
+    .map((we) => ({ ...we, ...parseTargetReps(we.target_reps) }));
 }
 
-async function loadState(exerciseId) {
-  current = orderedExercises.find((e) => String(e.id) === String(exerciseId));
+async function loadState(weId) {
+  current = orderedItems.find((it) => String(it.id) === String(weId));
   if (!current) {
     renderNotFound();
     return;
@@ -55,7 +67,7 @@ async function loadState(exerciseId) {
     .from('exercise_logs')
     .select('set_number, weight_lb')
     .eq('user_id', userId)
-    .eq('exercise_id', current.id)
+    .eq('workout_exercise_id', current.id)
     .gte('logged_at', todayStr + 'T00:00:00');
 
   current.todayWeights = {};
@@ -63,7 +75,7 @@ async function loadState(exerciseId) {
   const setsDone = Object.keys(current.todayWeights).length;
   current.currentSet = setsDone + 1;
 
-  if (setsDone >= current.target_sets) {
+  if (setsDone >= current.sets) {
     advanceToNext();
     return;
   }
@@ -72,7 +84,7 @@ async function loadState(exerciseId) {
     .from('exercise_logs')
     .select('weight_lb, logged_at')
     .eq('user_id', userId)
-    .eq('exercise_id', current.id)
+    .eq('workout_exercise_id', current.id)
     .lt('logged_at', todayStr + 'T00:00:00')
     .order('logged_at', { ascending: false })
     .limit(30);
@@ -124,28 +136,29 @@ function setRow(setNumber) {
 }
 
 function render() {
-  const idx = orderedExercises.findIndex((e) => e.id === current.id);
+  const idx = orderedItems.findIndex((it) => it.id === current.id);
   const card = document.getElementById('card');
+  const isCardio = current.section === 'Cardio' || current.section === 'Warm Up';
   card.innerHTML = `
     <div id="headerSlot"></div>
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-      <a href="workout-day.html?day=${dayId}" style="line-height:0; flex-shrink:0;"><i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i></a>
-      <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0; text-align:center; flex:1;">${dayName}</p>
+      <a href="workout-day.html?workout=${workoutId}" style="line-height:0; flex-shrink:0;"><i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i></a>
+      <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0; text-align:center; flex:1;">${workoutName}</p>
       <span style="width:15px; flex-shrink:0;"></span>
     </div>
-    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.1rem; text-align:center;">Exercise ${idx + 1} of ${orderedExercises.length}</p>
+    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.1rem; text-align:center;">Exercise ${idx + 1} of ${orderedItems.length}</p>
 
     <div style="background:var(--creme); border-radius:14px; aspect-ratio:4/3; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
-      ${current.video_url
-        ? `<video src="${current.video_url}" controls style="width:100%; height:100%; border-radius:14px; object-fit:cover;"></video>`
+      ${current.exercises.video_url
+        ? `<video src="${current.exercises.video_url}" controls style="width:100%; height:100%; border-radius:14px; object-fit:cover;"></video>`
         : '<i class="ti ti-video" style="font-size:34px; color:var(--latte);" aria-hidden="true"></i>'}
     </div>
 
-    <p class="mwp-title" style="font-size:22px; margin:0 0 4px; color:var(--creme);">${current.name}</p>
-    <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0 0 1.1rem;">${current.target_sets} sets · ${current.target_reps} reps</p>
+    <p class="mwp-title" style="font-size:22px; margin:0 0 4px; color:var(--creme);">${current.exercises.name}</p>
+    <p class="mwp-body" style="font-size:13px; color:var(--latte); margin:0 0 1.1rem;">${isCardio ? current.detail : `${current.sets} sets · ${current.detail}`}</p>
 
     <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
-      ${Array.from({ length: current.target_sets }, (_, i) => setRow(i + 1)).join('')}
+      ${Array.from({ length: current.sets }, (_, i) => setRow(i + 1)).join('')}
     </div>
 
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:1rem; font-size:12px; color:var(--latte);" class="mwp-body">
@@ -180,13 +193,13 @@ function renderDayComplete() {
 }
 
 function advanceToNext() {
-  const idx = orderedExercises.findIndex((e) => e.id === current.id);
-  const next = orderedExercises[idx + 1];
+  const idx = orderedItems.findIndex((it) => it.id === current.id);
+  const next = orderedItems[idx + 1];
   if (!next) {
     renderDayComplete();
     return;
   }
-  window.location.href = `workout-exercise.html?exercise=${next.id}&day=${dayId}`;
+  window.location.href = `workout-exercise.html?we=${next.id}&workout=${workoutId}`;
 }
 
 async function saveSet() {
@@ -199,10 +212,11 @@ async function saveSet() {
 
   const { error } = await sb.from('exercise_logs').insert({
     user_id: userId,
-    exercise_id: current.id,
+    exercise_id: current.exercises.id,
+    workout_exercise_id: current.id,
     set_number: current.currentSet,
     weight_lb: isNaN(weight) ? null : weight,
-    reps: current.target_reps,
+    reps: parseLeadingReps(current.detail),
     notes: notes || null,
   });
 
@@ -213,7 +227,7 @@ async function saveSet() {
     return;
   }
 
-  if (current.currentSet >= current.target_sets) {
+  if (current.currentSet >= current.sets) {
     advanceToNext();
   } else {
     await loadState(current.id);
@@ -227,13 +241,13 @@ async function saveSet() {
   todayStr = new Date().toISOString().slice(0, 10);
 
   const params = new URLSearchParams(window.location.search);
-  const exerciseId = params.get('exercise');
-  dayId = params.get('day');
+  const weId = params.get('we');
+  workoutId = params.get('workout');
 
-  orderedExercises = await loadDay();
-  if (!orderedExercises) return;
+  orderedItems = await loadWorkout();
+  if (!orderedItems) return;
 
-  await loadState(exerciseId);
+  await loadState(weId);
 })();
 </script>
 </body>
