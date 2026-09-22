@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#211E1B" />
 <link rel="manifest" href="manifest.json" />
@@ -141,7 +143,7 @@ async function submit() {
   const bodyFat = isNaN(bodyFatVal) ? null : bodyFatVal;
   const muscleMass = isNaN(muscleMassVal) ? null : muscleMassVal;
 
-  const { error } = await sb.from('checkins').insert({
+  const { data: checkin, error } = await sb.from('checkins').insert({
     user_id: userId,
     week_number: weekNumber,
     fasting_weight_lb: weight,
@@ -152,7 +154,7 @@ async function submit() {
     adherence_level: state.adherence,
     stress_level: state.stress,
     feedback_text: document.getElementById('feedbackInput').value.trim(),
-  });
+  }).select().single();
 
   if (error) {
     errEl.textContent = error.message;
@@ -174,7 +176,7 @@ async function submit() {
     const path = `${userId}/checkins/week${weekNumber}-${i}-${file.name}`;
     const { error: uploadError } = await sb.storage.from('photos').upload(path, file);
     if (!uploadError) {
-      await sb.from('progress_photos').insert({ user_id: userId, storage_path: path });
+      await sb.from('progress_photos').insert({ user_id: userId, storage_path: path, checkin_id: checkin.id });
     }
   }
 

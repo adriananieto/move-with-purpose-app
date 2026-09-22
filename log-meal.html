@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#211E1B" />
 <link rel="manifest" href="manifest.json" />
@@ -27,17 +29,37 @@
 <script src="js/nutritionApi.js"></script>
 <script>
 const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Snack AM', lunch: 'Lunch', snack_pm: 'Snack PM', dinner: 'Dinner' };
-const UNIT_TO_GRAMS = { g: 1, oz: 28.3495, cup: 240 };
+const UNIT_TO_GRAMS = { g: 1, oz: 28.3495 };
 const params = new URLSearchParams(window.location.search);
 const mealType = MEAL_LABELS[params.get('type')] ? params.get('type') : 'lunch';
 
 let userId;
 let items = [];
 let photoFile = null;
-let manualMode = false;
+let manualMode = true;
 let searchResults = [];
 let selectedFood = null;
 let searchTimer = null;
+let foodPortions = [];
+let portionsLoading = false;
+let searchQuery = '';
+let mealTarget = null;
+
+function gramsForUnit(unit, amount) {
+  if (unit === 'g') return amount * UNIT_TO_GRAMS.g;
+  if (unit === 'oz') return amount * UNIT_TO_GRAMS.oz;
+  if (unit.startsWith('measure:')) {
+    const portion = foodPortions[Number(unit.split(':')[1])];
+    return portion ? amount * portion.grams : 0;
+  }
+  return 0;
+}
+
+function unitLabel(unit) {
+  if (unit === 'g' || unit === 'oz') return unit;
+  const portion = foodPortions[Number(unit.split(':')[1])];
+  return portion ? portion.label : unit;
+}
 
 function totals() {
   return items.reduce((acc, i) => ({
@@ -58,6 +80,12 @@ function render() {
       <span style="width:19px;"></span>
     </div>
 
+    ${mealTarget ? `
+      <p class="mwp-body" style="font-size:11.5px; color:var(--latte); margin:0 0 12px; text-align:center;">
+        Target for this meal: ${mealTarget.calories} cal · ${mealTarget.protein_g}g protein · ${mealTarget.carbs_g}g carbs · ${mealTarget.fat_g}g fat
+      </p>
+    ` : ''}
+
     <label for="photoInput" style="cursor:pointer; background:var(--creme); border:1.5px dashed var(--latte); border-radius:12px; aspect-ratio:16/9; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;">
       <i class="ti ti-camera" style="font-size:20px; color:var(--latte);" aria-hidden="true"></i>
       <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:0;">${photoFile ? photoFile.name : 'Add a photo'}</p>
@@ -71,7 +99,7 @@ function render() {
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
       ${items.map((item, idx) => `
         <div style="display:flex; align-items:center; justify-content:space-between; background:var(--creme); border-radius:10px; padding:11px 13px;">
-          <span class="mwp-body" style="font-size:13px; color:var(--ink);">${item.name} · ${item.amount}${item.unit}</span>
+          <span class="mwp-body" style="font-size:13px; color:var(--ink);">${item.name} · ${item.amount} ${item.unit}</span>
           <div style="display:flex; align-items:center; gap:9px;">
             <span class="mwp-body" style="font-size:11.5px; color:var(--latte);">${item.calories} cal</span>
             <i class="ti ti-x" data-remove="${idx}" style="font-size:13px; color:var(--latte); cursor:pointer;" aria-hidden="true"></i>
@@ -99,7 +127,7 @@ function renderFoodSearch() {
   return `
     <p class="mwp-label" style="font-size:10.5px; color:var(--creme); margin:0 0 7px;">Search food</p>
     <div style="position:relative; margin-bottom:${selectedFood ? '10px' : '14px'};">
-      <input type="text" id="foodSearch" placeholder="e.g. chicken breast" class="mwp-input" autocomplete="off" />
+      <input type="text" id="foodSearch" placeholder="e.g. chicken breast" class="mwp-input" autocomplete="off" value="${searchQuery}" />
       ${searchResults.length ? `
         <div style="position:absolute; top:100%; left:0; right:0; background:var(--creme); border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto; z-index:10;">
           ${searchResults.map((f, idx) => `
@@ -113,12 +141,14 @@ function renderFoodSearch() {
       <div style="background:var(--creme); border-radius:10px; padding:12px; margin-bottom:14px;">
         <p class="mwp-title" style="font-size:13px; margin:0 0 8px; color:var(--ink);">${selectedFood.description}</p>
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-          <input type="number" id="amountValue" value="100" class="mwp-input" style="flex:1;" />
-          <select id="amountUnit" class="mwp-select" style="width:74px;">
-            <option value="g">g</option><option value="oz">oz</option><option value="cup">cup</option>
+          <input type="number" id="amountValue" value="1" class="mwp-input" style="flex:1;" />
+          <select id="amountUnit" class="mwp-select" style="width:auto; max-width:150px;">
+            <option value="oz" selected>oz</option>
+            <option value="g">g</option>
+            ${foodPortions.map((p, idx) => `<option value="measure:${idx}">${p.label} (${Math.round(p.grams)}g)</option>`).join('')}
           </select>
         </div>
-        <p class="mwp-body" style="font-size:11.5px; color:var(--latte); margin:0 0 10px;" id="livePreview"></p>
+        <p class="mwp-body" style="font-size:11.5px; color:var(--latte); margin:0 0 10px;" id="livePreview">${portionsLoading ? 'Loading measures…' : ''}</p>
         <button id="addSelectedBtn" class="mwp-btn" style="padding:10px;">Add to meal</button>
       </div>
     ` : ''}
@@ -157,6 +187,8 @@ function attachHandlers() {
     manualMode = !manualMode;
     searchResults = [];
     selectedFood = null;
+    foodPortions = [];
+    searchQuery = '';
     render();
   });
 
@@ -174,17 +206,18 @@ function attachHandlers() {
   } else {
     const searchInput = document.getElementById('foodSearch');
     searchInput.addEventListener('input', (e) => {
-      const q = e.target.value;
+      searchQuery = e.target.value;
       clearTimeout(searchTimer);
       searchTimer = setTimeout(async () => {
         try {
-          searchResults = await searchFoods(q);
+          searchResults = await searchFoods(searchQuery);
         } catch {
           searchResults = [];
         }
         render();
-        document.getElementById('foodSearch').focus();
-        document.getElementById('foodSearch').setSelectionRange(q.length, q.length);
+        const input = document.getElementById('foodSearch');
+        input.focus();
+        input.setSelectionRange(searchQuery.length, searchQuery.length);
       }, 400);
     });
 
@@ -192,7 +225,9 @@ function attachHandlers() {
       el.addEventListener('click', () => {
         selectedFood = searchResults[Number(el.dataset.select)];
         searchResults = [];
+        foodPortions = [];
         render();
+        loadPortions(selectedFood.fdcId);
       });
     });
 
@@ -200,7 +235,8 @@ function attachHandlers() {
       const amountInput = document.getElementById('amountValue');
       const unitSelect = document.getElementById('amountUnit');
       const updatePreview = () => {
-        const grams = (parseFloat(amountInput.value) || 0) * UNIT_TO_GRAMS[unitSelect.value];
+        if (portionsLoading) return;
+        const grams = gramsForUnit(unitSelect.value, parseFloat(amountInput.value) || 0);
         const m = scaleMacros(selectedFood.per100g, grams);
         document.getElementById('livePreview').textContent = `${m.calories} cal · ${m.protein}g protein · ${m.carbs}g carbs · ${m.fat}g fat`;
       };
@@ -212,14 +248,26 @@ function attachHandlers() {
   }
 }
 
+async function loadPortions(fdcId) {
+  portionsLoading = true;
+  try {
+    foodPortions = await getFoodPortions(fdcId);
+  } catch {
+    foodPortions = [];
+  }
+  portionsLoading = false;
+  if (selectedFood && selectedFood.fdcId === fdcId) render();
+}
+
 function addSelectedFood() {
   const amount = parseFloat(document.getElementById('amountValue').value) || 0;
   const unit = document.getElementById('amountUnit').value;
-  const grams = amount * UNIT_TO_GRAMS[unit];
+  const grams = gramsForUnit(unit, amount);
   const m = scaleMacros(selectedFood.per100g, grams);
-  items.push({ name: selectedFood.description, amount, unit, ...m });
+  items.push({ name: selectedFood.description, amount, unit: unitLabel(unit), ...m });
   selectedFood = null;
-  document.getElementById('foodSearch').value = '';
+  foodPortions = [];
+  searchQuery = '';
   render();
 }
 
@@ -299,6 +347,10 @@ async function saveEntry() {
   const session = await requireSession();
   if (!session) return;
   userId = session.user.id;
+
+  const { data } = await sb.from('meal_targets').select('*').eq('user_id', userId).eq('meal_type', mealType).maybeSingle();
+  mealTarget = data;
+
   render();
 })();
 </script>

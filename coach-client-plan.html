@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#211E1B" />
+<link rel="manifest" href="manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png?v=2" />
+<link rel="icon" href="assets/mova-app-icon.png?v=2" />
+<title>MOVA · Coach</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css?v=4" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Snack AM', lunch: 'Lunch', snack_pm: 'Snack PM', dinner: 'Dinner' };
+const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
+
+function parseTargetReps(targetReps) {
+  const m = /^\[(.+?)\]\s*(.*)$/.exec(targetReps || '');
+  return m ? { section: m[1], detail: m[2] } : { section: 'Workout', detail: targetReps || '' };
+}
+
+function macroLine(calories, protein, carbs, fat) {
+  const parts = [];
+  if (calories != null) parts.push(`${calories} cal`);
+  if (protein != null) parts.push(`${protein}g protein`);
+  if (carbs != null) parts.push(`${carbs}g carbs`);
+  if (fat != null) parts.push(`${fat}g fat`);
+  return parts.join(' · ');
+}
+
+function workoutCard(w) {
+  const items = [...w.workout_exercises]
+    .sort((a, b) => a.order_index - b.order_index)
+    .map((we) => ({ ...we, ...parseTargetReps(we.target_reps) }));
+
+  return `
+    <div style="background:var(--creme); border-radius:14px; padding:16px; margin-bottom:12px;">
+      <p class="mwp-title" style="font-size:14px; margin:0 0 10px; color:var(--ink);">${w.name}</p>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${items.map((it) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <span class="mwp-body" style="font-size:12.5px; color:var(--ink);">
+              <span style="color:var(--latte);">[${it.section}]</span> ${it.exercises.name}
+            </span>
+            <span class="mwp-body" style="font-size:11.5px; color:var(--latte); text-align:right; white-space:nowrap;">
+              ${it.section === 'Cardio' || it.section === 'Warm Up' ? it.detail : `${it.sets}x${it.detail}`}
+              ${it.exercises.video_url ? '' : ' · no video'}
+            </span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function foodGroup(category, foods) {
+  return `
+    <div style="margin-bottom:14px;">
+      <p class="mwp-label" style="font-size:10px; color:var(--creme); margin:0 0 7px;">${category}</p>
+      <div style="background:var(--creme); border-radius:12px; padding:4px 14px;">
+        ${foods.map((f, idx) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; ${idx < foods.length - 1 ? 'border-bottom:0.5px solid rgba(0,0,0,0.08);' : ''}">
+            <span class="mwp-body" style="font-size:13px; color:var(--ink);">${f.name}</span>
+            ${f.portion ? `<span class="mwp-body" style="font-size:11.5px; color:var(--latte);">${f.portion}</span>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function mealOptionsGroup(type, options, target) {
+  return `
+    <div style="margin-bottom:14px;">
+      <p class="mwp-label" style="font-size:10px; color:var(--creme); margin:0 0 7px;">
+        ${MEAL_LABELS[type]}${target ? ` — ${macroLine(target.calories, target.protein_g, target.carbs_g, target.fat_g)}` : ''}
+      </p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${options.map((o) => `
+          <div style="background:var(--creme); border-radius:12px; padding:13px 14px;">
+            <p class="mwp-title" style="font-size:12.5px; margin:0 0 4px; color:var(--ink);">${o.option_label}</p>
+            <p class="mwp-body" style="font-size:12.5px; color:var(--ink); margin:0; line-height:1.4;">${o.description}</p>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  const userId = session.user.id;
+  const clientId = new URLSearchParams(window.location.search).get('client');
+  const card = document.getElementById('card');
+
+  const { data: me } = await sb.from('profiles').select('is_coach').eq('id', userId).single();
+  if (!me?.is_coach) {
+    card.innerHTML = '<p class="mwp-loading">This screen is only for coach accounts.</p>';
+    return;
+  }
+
+  const [clientRes, workoutsRes, targetRes, mealTargetsRes, foodsRes, optionsRes] = await Promise.all([
+    sb.from('profiles').select('full_name, plan_tier').eq('id', clientId).single(),
+    sb.from('workouts').select('id, name, workout_exercises(id, sets, target_reps, order_index, exercises(id, name, video_url))').eq('client_id', clientId).order('name'),
+    sb.from('nutrition_targets').select('*').eq('user_id', clientId).maybeSingle(),
+    sb.from('meal_targets').select('*').eq('user_id', clientId),
+    sb.from('recommended_foods').select('*').eq('user_id', clientId).order('category').order('order_index'),
+    sb.from('meal_options').select('*').eq('user_id', clientId).order('meal_type').order('order_index'),
+  ]);
+
+  if (!clientRes.data) {
+    card.innerHTML = '<p class="mwp-loading">Client not found.</p>';
+    return;
+  }
+
+  const workouts = workoutsRes.data || [];
+
+  const mealTargets = {};
+  (mealTargetsRes.data || []).forEach((t) => { mealTargets[t.meal_type] = t; });
+
+  const foodsByCategory = {};
+  (foodsRes.data || []).forEach((f) => { (foodsByCategory[f.category] ||= []).push(f); });
+
+  const optionsByMeal = {};
+  (optionsRes.data || []).forEach((o) => { (optionsByMeal[o.meal_type] ||= []).push(o); });
+
+  card.innerHTML = `
+    <div id="headerSlot"></div>
+    <a href="coach-clients.html" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; margin-bottom:1rem;">
+      <i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>
+      <span class="mwp-body" style="font-size:12px; color:var(--latte);">Clients</span>
+    </a>
+
+    <p class="mwp-body" style="font-size:11px; color:var(--latte); margin:0 0 1.2rem;">${clientRes.data.plan_tier}</p>
+
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Training Split</p>
+    ${workouts.length ? workouts.map(workoutCard).join('') : '<p class="mwp-loading">No workout plan assigned yet.</p>'}
+
+    ${targetRes.data ? `
+      <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:1.1rem 0 9px;">Daily Nutrition Target</p>
+      <div style="background:var(--latte); border-radius:12px; padding:14px; margin-bottom:1.3rem;">
+        <p class="mwp-title" style="font-size:20px; margin:0 0 4px; color:var(--ink);">${targetRes.data.calories} cal</p>
+        <p class="mwp-body" style="font-size:12px; color:var(--ink); margin:0;">${targetRes.data.protein_g}g protein · ${targetRes.data.carbs_g}g carbs · ${targetRes.data.fat_g}g fat</p>
+      </div>
+    ` : ''}
+
+    ${Object.keys(foodsByCategory).length ? `
+      <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Recommended Foods</p>
+      ${Object.keys(foodsByCategory).map((cat) => foodGroup(cat, foodsByCategory[cat])).join('')}
+    ` : ''}
+
+    ${Object.keys(optionsByMeal).length ? `
+      <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:1.1rem 0 9px;">Meal Options</p>
+      ${MEAL_ORDER.filter((t) => optionsByMeal[t]).map((t) => mealOptionsGroup(t, optionsByMeal[t], mealTargets[t])).join('')}
+    ` : ''}
+  `;
+
+  renderHeader(document.getElementById('headerSlot'), { title: clientRes.data.full_name });
+})();
+</script>
+</body>
+</html>

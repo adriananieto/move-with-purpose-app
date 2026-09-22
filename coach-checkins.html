@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#211E1B" />
+<link rel="manifest" href="manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png?v=2" />
+<link rel="icon" href="assets/mova-app-icon.png?v=2" />
+<title>MOVA · Coach</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="css/app.css?v=4" />
+</head>
+<body>
+
+<div class="mwp-card" id="card">
+  <p class="mwp-loading">Loading…</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script>
+function normalize(values) {
+  const nums = values.filter((v) => v !== null).map(Number);
+  if (!nums.length) return values.map(() => null);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const range = max - min || 1;
+  return values.map((v) => (v === null ? null : (1 - (Number(v) - min) / range)));
+}
+
+function seriesToPoints(values, stepX) {
+  const norm = normalize(values);
+  return norm.map((v, i) => {
+    if (v === null) return null;
+    const x = 10 + i * stepX;
+    const y = 15 + v * 45;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+}
+
+function polylines(points) {
+  const segments = [];
+  let current = [];
+  points.forEach((p) => {
+    if (p === null) {
+      if (current.length) segments.push(current);
+      current = [];
+    } else {
+      current.push(p);
+    }
+  });
+  if (current.length) segments.push(current);
+  return segments;
+}
+
+function weightChart(logs) {
+  if (logs.length < 2) {
+    return '<p class="mwp-body" style="font-size:12.5px; color:var(--latte); text-align:center; padding:22px 0;">Not enough data yet for a trend line.</p>';
+  }
+  const stepX = 260 / (logs.length - 1);
+  const weightPts = seriesToPoints(logs.map((l) => l.weight_lb), stepX);
+  const fatPts = seriesToPoints(logs.map((l) => l.body_fat_pct), stepX);
+  const musclePts = seriesToPoints(logs.map((l) => l.muscle_mass_lb), stepX);
+
+  const line = (pts, dash, width) => polylines(pts).map((seg) =>
+    `<polyline points="${seg.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" ${dash ? `stroke-dasharray="${dash}"` : ''}/>`
+  ).join('');
+
+  return `
+    <svg viewBox="0 0 280 60" style="width:100%; height:60px;">
+      ${line(musclePts, '5,2.5', 1.6)}
+      ${line(fatPts, '2,2', 1.6)}
+      ${line(weightPts, null, 2.5)}
+    </svg>
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--latte); margin:5px 0 12px;" class="mwp-body">
+      <span>${logs[0].logged_at}</span><span>${logs[logs.length - 1].logged_at}</span>
+    </div>
+    <div style="display:flex; gap:14px; flex-wrap:wrap;">
+      <span class="mwp-body" style="font-size:10.5px; color:var(--ink); display:flex; align-items:center; gap:5px;"><span style="width:12px; height:2.5px; background:var(--ink); display:inline-block;"></span>Weight</span>
+      <span class="mwp-body" style="font-size:10.5px; color:var(--ink); display:flex; align-items:center; gap:5px;"><span style="width:12px; height:1.6px; background:repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px); display:inline-block;"></span>Body Fat</span>
+      <span class="mwp-body" style="font-size:10.5px; color:var(--ink); display:flex; align-items:center; gap:5px;"><span style="width:12px; height:1.6px; background:repeating-linear-gradient(90deg, var(--ink) 0 5px, transparent 5px 7.5px); display:inline-block;"></span>Muscle Mass</span>
+    </div>`;
+}
+
+function scalePill(label, value) {
+  return `
+    <div style="flex:1; background:var(--froth, var(--creme)); border-radius:8px; padding:8px 6px; text-align:center;">
+      <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">${value ?? '—'}</p>
+      <p class="mwp-label" style="font-size:8px; color:var(--latte); margin:3px 0 0;">${label}</p>
+    </div>`;
+}
+
+function checkinCard(c, photos) {
+  const date = new Date(c.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `
+    <div style="background:var(--creme); border-radius:14px; padding:16px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+        <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">Week ${c.week_number}</p>
+        <p class="mwp-body" style="font-size:11px; color:var(--latte); margin:0;">${date}</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
+        ${scalePill('Weight (lb)', c.fasting_weight_lb)}
+        ${scalePill('Body Fat %', c.body_fat_pct)}
+        ${scalePill('Muscle (lb)', c.muscle_mass_lb)}
+      </div>
+
+      ${photos.length ? `
+        <div style="display:grid; grid-template-columns: repeat(${photos.length}, 1fr); gap:6px; margin-bottom:10px;">
+          ${photos.map((p) => `<div style="aspect-ratio:3/4; background:var(--froth, #000); border-radius:8px; overflow:hidden;"><img src="${p.url}" alt="Progress photo" style="width:100%; height:100%; object-fit:cover;" /></div>`).join('')}
+        </div>
+      ` : ''}
+
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        ${scalePill('Hunger', c.hunger_level)}
+        ${scalePill('Energy', c.energy_level)}
+        ${scalePill('Adherence', c.adherence_level)}
+        ${scalePill('Stress', c.stress_level)}
+      </div>
+
+      ${c.feedback_text ? `
+        <p class="mwp-label" style="font-size:9px; color:var(--latte); margin:0 0 4px;">Feedback</p>
+        <p class="mwp-body" style="font-size:12.5px; color:var(--ink); margin:0 0 12px; line-height:1.4;">${c.feedback_text}</p>
+      ` : ''}
+
+      <p class="mwp-label" style="font-size:9px; color:var(--latte); margin:0 0 4px;">Your reply</p>
+      <textarea data-reply-input="${c.id}" class="mwp-textarea" style="background:var(--froth, #fff); height:56px; font-size:12.5px; margin-bottom:6px;" placeholder="Write feedback for this check-in...">${c.coach_reply || ''}</textarea>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button data-reply-save="${c.id}" class="mwp-btn-link">Save reply</button>
+        <span data-reply-status="${c.id}" class="mwp-body" style="font-size:10.5px; color:var(--latte);"></span>
+      </div>
+    </div>`;
+}
+
+(async () => {
+  const session = await requireSession();
+  if (!session) return;
+  const userId = session.user.id;
+  const clientId = new URLSearchParams(window.location.search).get('client');
+  const card = document.getElementById('card');
+
+  const { data: me } = await sb.from('profiles').select('is_coach').eq('id', userId).single();
+  if (!me?.is_coach) {
+    card.innerHTML = '<p class="mwp-loading">This screen is only for coach accounts.</p>';
+    return;
+  }
+
+  const [clientRes, checkinsRes, weightLogsRes, photosRes] = await Promise.all([
+    sb.from('profiles').select('full_name, member_since').eq('id', clientId).single(),
+    sb.from('checkins').select('*').eq('user_id', clientId).order('submitted_at', { ascending: false }),
+    sb.from('body_weight_logs').select('weight_lb, body_fat_pct, muscle_mass_lb, logged_at').eq('user_id', clientId).order('logged_at', { ascending: true }),
+    sb.from('progress_photos').select('checkin_id, storage_path').eq('user_id', clientId).not('checkin_id', 'is', null),
+  ]);
+
+  if (!clientRes.data) {
+    card.innerHTML = '<p class="mwp-loading">Client not found.</p>';
+    return;
+  }
+
+  const checkins = checkinsRes.data || [];
+  const photosByCheckin = {};
+  (photosRes.data || []).forEach((p) => {
+    const url = sb.storage.from('photos').getPublicUrl(p.storage_path).data.publicUrl;
+    (photosByCheckin[p.checkin_id] ||= []).push({ url });
+  });
+
+  card.innerHTML = `
+    <div id="headerSlot"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <a href="coach-clients.html" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none;">
+        <i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>
+        <span class="mwp-body" style="font-size:12px; color:var(--latte);">Clients</span>
+      </a>
+      <a href="coach-client-plan.html?client=${clientId}" style="text-decoration:none;">
+        <span class="mwp-body" style="font-size:12px; color:var(--latte); text-decoration:underline;">View plan</span>
+      </a>
+    </div>
+
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Body Composition Trend</p>
+    <div style="background:var(--creme); border-radius:12px; padding:16px; margin-bottom:1.3rem;">
+      ${weightChart(weightLogsRes.data || [])}
+    </div>
+
+    <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Check-in History &nbsp;·&nbsp; ${checkins.length}</p>
+    ${checkins.length
+      ? checkins.map((c) => checkinCard(c, photosByCheckin[c.id] || [])).join('')
+      : '<p class="mwp-loading">No check-ins submitted yet.</p>'}
+  `;
+
+  renderHeader(document.getElementById('headerSlot'), { title: clientRes.data.full_name });
+
+  document.querySelectorAll('[data-reply-save]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const checkinId = btn.dataset.replySave;
+      const input = document.querySelector(`[data-reply-input="${checkinId}"]`);
+      const status = document.querySelector(`[data-reply-status="${checkinId}"]`);
+      btn.disabled = true;
+      status.textContent = 'Saving…';
+
+      const { error } = await sb.from('checkins')
+        .update({ coach_reply: input.value.trim() })
+        .eq('id', checkinId);
+
+      status.textContent = error ? error.message : 'Saved';
+      btn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

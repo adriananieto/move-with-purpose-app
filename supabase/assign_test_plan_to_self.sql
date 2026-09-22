@@ -8,7 +8,7 @@ create temporary table _self_client as
 select p.id as client_id
 from public.profiles p
 join auth.users u on u.id = p.id
-where u.email = 'YOUR_EMAIL_HERE';  -- <-- EDIT: your own login email
+where u.email = 'anietopr@gmail.com';
 
 do $$
 begin

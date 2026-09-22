@@ -1,4 +1,4 @@
-const USDA_API_KEY = 'DEMO_KEY';
+const USDA_API_KEY = 'lxQiB59jN8wZGlL443xM1Nt99OnlhspRSkaVG3mz';
 
 const USDA_NUTRIENT_IDS = { calories: 1008, protein: 1003, fat: 1004, carbs: 1005 };
 
@@ -25,6 +25,32 @@ function extractMacrosPer100g(foodNutrients) {
     if (n.nutrientId === USDA_NUTRIENT_IDS.carbs) macros.carbs = n.value || 0;
   });
   return macros;
+}
+
+async function getFoodPortions(fdcId) {
+  const url = `https://api.nal.usda.gov/fdc/v1/food/${fdcId}?api_key=${USDA_API_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+
+  const portions = [];
+  (data.foodPortions || []).forEach((p) => {
+    if (!p.gramWeight) return;
+    const label = (p.portionDescription && p.portionDescription !== 'undefined')
+      ? p.portionDescription
+      : [p.amount, p.modifier].filter(Boolean).join(' ');
+    if (label && label.trim()) {
+      // Strip a leading "1 " — the app shows the user's own quantity separately.
+      portions.push({ label: label.trim().replace(/^1\s+/, ''), grams: p.gramWeight });
+    }
+  });
+
+  if (!portions.length && data.servingSize && /^(g|ml)$/i.test(data.servingSizeUnit || '')) {
+    const label = data.householdServingFullText || `serving (${data.servingSize}${data.servingSizeUnit})`;
+    portions.push({ label: label.trim().replace(/^1\s+/, ''), grams: data.servingSize });
+  }
+
+  return portions;
 }
 
 function scaleMacros(per100g, amountGrams) {
