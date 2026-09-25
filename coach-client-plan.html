@@ -60,7 +60,7 @@ function workoutCard(w) {
             </span>
             <span class="mwp-body" style="font-size:11.5px; color:var(--latte); text-align:right; white-space:nowrap;">
               ${it.section === 'Cardio' || it.section === 'Warm Up' ? it.detail : `${it.sets}x${it.detail}`}
-              ${it.exercises.video_url ? '' : ' · no video'}
+              ${it.exercises.video_url || it.section === 'Cardio' ? '' : ' · no video'}
             </span>
           </div>`).join('')}
       </div>

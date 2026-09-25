@@ -41,13 +41,27 @@
   monday.setHours(0, 0, 0, 0);
   const mondayStr = monday.toISOString().slice(0, 10);
 
-  const [profileRes, workoutsRes, exerciseLogsRes, nutritionTargetRes, mealLogsRes] = await Promise.all([
-    sb.from('profiles').select('full_name, phase_start_date').eq('id', userId).single(),
+  const [profileRes, workoutsRes, exerciseLogsRes, nutritionTargetRes, mealLogsRes, checkinsThisWeekRes] = await Promise.all([
+    sb.from('profiles').select('full_name, phase_start_date, renewal_date').eq('id', userId).single(),
     sb.from('workouts').select('id, name, workout_exercises(id, sets)').eq('client_id', userId).order('name'),
     sb.from('exercise_logs').select('workout_exercise_id, set_number, logged_at').eq('user_id', userId).gte('logged_at', mondayStr).not('workout_exercise_id', 'is', null),
     sb.from('nutrition_targets').select('calories').eq('user_id', userId).single(),
     sb.from('meal_logs').select('total_calories').eq('user_id', userId).eq('logged_at', todayStr),
+    sb.from('checkins').select('id').eq('user_id', userId).gte('submitted_at', mondayStr).limit(1),
   ]);
+
+  // Check-in reminder: from Thursday (day 3) through the end of the week, if she
+  // hasn't submitted one yet this week.
+  const showCheckinReminder = day >= 3 && !(checkinsThisWeekRes.data || []).length;
+
+  // Renewal reminder: renewal_date set and due within the next 3 days (or already
+  // passed) — Adriana clears this by moving renewal_date forward once paid.
+  const renewalDate = profileRes.data?.renewal_date;
+  let showRenewalReminder = false;
+  if (renewalDate) {
+    const daysUntilRenewal = Math.floor((new Date(renewalDate + 'T00:00:00') - now) / (24 * 60 * 60 * 1000));
+    showRenewalReminder = daysUntilRenewal <= 3;
+  }
 
   const fullName = profileRes.data?.full_name || 'there';
   const firstName = fullName.split(' ')[0];
@@ -80,6 +94,20 @@
       <p class="mwp-title" style="font-size:26px; margin:0; color:var(--creme);">Hello, ${firstName}!</p>
       <button id="logoutBtn" style="width:38px; height:38px; border-radius:50%; background:var(--creme); border:none; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;"><i class="ti ti-logout" style="font-size:18px; color:var(--ink);" aria-hidden="true"></i></button>
     </div>
+
+    ${showRenewalReminder ? `
+      <div style="display:flex; align-items:center; gap:10px; background:var(--chai); border-radius:12px; padding:12px 14px; margin-bottom:0.8rem;">
+        <i class="ti ti-alert-circle" style="font-size:18px; color:var(--ink); flex-shrink:0;" aria-hidden="true"></i>
+        <p class="mwp-body" style="font-size:12.5px; color:var(--ink); margin:0;">Tu renovación es el ${renewalDate} — no olvides tu pago por ATH Móvil.</p>
+      </div>
+    ` : ''}
+
+    ${showCheckinReminder ? `
+      <a href="checkin.html" style="text-decoration:none; display:flex; align-items:center; gap:10px; background:var(--chai); border-radius:12px; padding:12px 14px; margin-bottom:0.8rem;">
+        <i class="ti ti-clipboard-list" style="font-size:18px; color:var(--ink); flex-shrink:0;" aria-hidden="true"></i>
+        <p class="mwp-body" style="font-size:12.5px; color:var(--ink); margin:0;">No olvides tu check-in semanal 💪</p>
+      </a>
+    ` : ''}
 
     <div style="background:var(--latte); border-radius:14px; padding:1.3rem 1.2rem; margin-bottom:1rem;">
       <p class="mwp-label" style="font-size:10px; color:var(--ink); margin:0 0 7px;">Weekly Progress</p>

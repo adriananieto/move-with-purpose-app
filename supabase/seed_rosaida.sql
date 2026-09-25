@@ -41,11 +41,11 @@ insert into public.exercises (name, video_url)
 select v.name, null
 from (values
   ('Escalera'), ('Hip Thrust'), ('Walking Lunges'), ('Sumo Squats'), ('Cable Kickback'),
-  ('Dumbbell RDLs'), ('Laying Hamstring Curl'), ('Jump Squats'), ('Calf Raises'), ('Crunches'),
+  ('Dumbbell RDLs'), ('Laying Hamstring Curl'), ('Jump Squats'), ('Calf Raises (Barbell)'), ('Crunches'),
   ('Bicycle Crunches'), ('Pull Ups'), ('Tricep Dips'), ('Overhead Tricep Extension'), ('Push Press'),
   ('Lateral Raises'), ('Plank Shoulder Taps'), ('Plank to Push Ups'), ('Burpees'), ('Mountain Climbers'),
-  ('Russian Twists'), ('Bulgarian Split Squats'), ('Goblet Squats'), ('Cable Leg Lateral Raises'), ('Leg Press'),
-  ('Leg Extension'), ('Reverse Crunches'), ('Bicep Curls'), ('Hammer Curls'), ('Tricep Kickbacks'),
+  ('Russian Twist'), ('Bulgarian Split Squats'), ('Goblet Squats'), ('Cable Leg Lateral Raises'), ('Leg Press'),
+  ('Leg Extension'), ('Reverse Crunches'), ('Bicep Curl (Barbell)'), ('Hammer Curl'), ('Tricep Kickback'),
   ('Arnold Press'), ('Bicep Concentrated Curls'), ('Skull Crushers'), ('Squats'), ('Deadlift'),
   ('Lat Pulldown'), ('Planks')
 ) as v(name)
@@ -86,7 +86,7 @@ from (values
   ('Day 1 - Lower Body', 'Dumbbell RDLs', 3, '[Workout] 15', 6),
   ('Day 1 - Lower Body', 'Laying Hamstring Curl', 3, '[Workout] 12', 7),
   ('Day 1 - Lower Body', 'Jump Squats', 3, '[Workout] 10', 8),
-  ('Day 1 - Lower Body', 'Calf Raises', 3, '[Workout] 15', 9),
+  ('Day 1 - Lower Body', 'Calf Raises (Barbell)', 3, '[Workout] 15', 9),
   ('Day 1 - Lower Body', 'Crunches', 3, '[Core] 15, con peso', 10),
   ('Day 1 - Lower Body', 'Bicycle Crunches', 3, '[Core] 10 c/lado, cruzado', 11),
   ('Day 1 - Lower Body', 'Escalera', 1, '[Cardio] 30 min, pace moderado', 12),
@@ -102,7 +102,7 @@ from (values
   ('Day 2 - Upper Body', 'Plank to Push Ups', 3, '[Workout] 10', 8),
   ('Day 2 - Upper Body', 'Burpees', 3, '[Workout] 10', 9),
   ('Day 2 - Upper Body', 'Mountain Climbers', 3, '[Core] 20, cruzado', 10),
-  ('Day 2 - Upper Body', 'Russian Twists', 3, '[Core] 10 c/lado, con peso', 11),
+  ('Day 2 - Upper Body', 'Russian Twist', 3, '[Core] 10 c/lado, con peso', 11),
   ('Day 2 - Upper Body', 'Escalera', 1, '[Cardio] 30 min, pace moderado', 12),
 
   -- Day 3 — Lower Body
@@ -114,23 +114,23 @@ from (values
   ('Day 3 - Lower Body', 'Leg Press', 3, '[Workout] 12, abajo + cerrado', 6),
   ('Day 3 - Lower Body', 'Leg Extension', 3, '[Workout] 12', 7),
   ('Day 3 - Lower Body', 'Walking Lunges', 3, '[Workout] 10 c/lado', 8),
-  ('Day 3 - Lower Body', 'Calf Raises', 3, '[Workout] 15', 9),
+  ('Day 3 - Lower Body', 'Calf Raises (Barbell)', 3, '[Workout] 15', 9),
   ('Day 3 - Lower Body', 'Reverse Crunches', 3, '[Core] 15', 10),
   ('Day 3 - Lower Body', 'Bicycle Crunches', 3, '[Core] 20, cruzado', 11),
   ('Day 3 - Lower Body', 'Escalera', 1, '[Cardio] 30 min, pace moderado', 12),
 
   -- Day 4 — Upper Body
   ('Day 4 - Upper Body', 'Escalera', 1, '[Warm Up] 10 min, pace moderado', 1),
-  ('Day 4 - Upper Body', 'Bicep Curls', 3, '[Workout] 15', 2),
-  ('Day 4 - Upper Body', 'Hammer Curls', 3, '[Workout] 12', 3),
-  ('Day 4 - Upper Body', 'Tricep Kickbacks', 3, '[Workout] 15 c/lado', 4),
+  ('Day 4 - Upper Body', 'Bicep Curl (Barbell)', 3, '[Workout] 15', 2),
+  ('Day 4 - Upper Body', 'Hammer Curl', 3, '[Workout] 12', 3),
+  ('Day 4 - Upper Body', 'Tricep Kickback', 3, '[Workout] 15 c/lado', 4),
   ('Day 4 - Upper Body', 'Arnold Press', 3, '[Workout] 10', 5),
   ('Day 4 - Upper Body', 'Bicep Concentrated Curls', 3, '[Workout] 7-7-7', 6),
   ('Day 4 - Upper Body', 'Skull Crushers', 3, '[Workout] 12', 7),
   ('Day 4 - Upper Body', 'Plank to Push Ups', 3, '[Workout] 10', 8),
   ('Day 4 - Upper Body', 'Burpees', 3, '[Workout] 10', 9),
   ('Day 4 - Upper Body', 'Reverse Crunches', 3, '[Core] 15', 10),
-  ('Day 4 - Upper Body', 'Russian Twists', 3, '[Core] 10 c/lado, con peso', 11),
+  ('Day 4 - Upper Body', 'Russian Twist', 3, '[Core] 10 c/lado, con peso', 11),
   ('Day 4 - Upper Body', 'Escalera', 1, '[Cardio] 30 min, pace moderado', 12),
 
   -- Day 5 — Full Body (Pump Day) — no warm up or cardio listed
@@ -139,7 +139,7 @@ from (values
   ('Day 5 - Full Body (Pump Day)', 'Lat Pulldown', 3, '[Workout] 12', 3),
   ('Day 5 - Full Body (Pump Day)', 'Push Press', 3, '[Workout] 10', 4),
   ('Day 5 - Full Body (Pump Day)', 'Walking Lunges', 3, '[Workout] 10 c/lado', 5),
-  ('Day 5 - Full Body (Pump Day)', 'Bicep Curls', 3, '[Workout] 12', 6),
+  ('Day 5 - Full Body (Pump Day)', 'Bicep Curl (Barbell)', 3, '[Workout] 12', 6),
   ('Day 5 - Full Body (Pump Day)', 'Tricep Dips', 3, '[Workout] 15', 7),
   ('Day 5 - Full Body (Pump Day)', 'Burpees', 3, '[Workout] 10', 8),
   ('Day 5 - Full Body (Pump Day)', 'Planks', 3, '[Core] 1 min', 9),
