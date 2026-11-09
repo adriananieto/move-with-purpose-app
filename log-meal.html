@@ -27,7 +27,7 @@
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/viewAs.js"></script>
-<script src="js/meals.js"></script>
+<script src="js/meals.js?v=2"></script>
 <script src="js/nutritionApi.js"></script>
 <script>
 const UNIT_TO_GRAMS = { g: 1, oz: 28.3495 };
@@ -81,7 +81,7 @@ function render() {
       <span style="width:19px;"></span>
     </div>
 
-    ${mealTarget ? `
+    ${hasMealMacros(mealTarget) ? `
       <p class="mwp-body" style="font-size:11.5px; color:var(--latte); margin:0 0 12px; text-align:center;">
         Target for this meal: ${mealTarget.calories} cal · ${mealTarget.protein_g}g protein · ${mealTarget.carbs_g}g carbs · ${mealTarget.fat_g}g fat
       </p>

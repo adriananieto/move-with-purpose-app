@@ -27,7 +27,7 @@
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/viewAs.js"></script>
-<script src="js/meals.js"></script>
+<script src="js/meals.js?v=2"></script>
 <script>
 let mealTargets = {};
 
@@ -70,7 +70,7 @@ function mealOptionsGroup(type, options) {
         ${options.map((o) => `
           <div style="background:var(--creme); border-radius:12px; padding:13px 14px;">
             <p class="mwp-title" style="font-size:12.5px; margin:0 0 4px; color:var(--ink);">${o.option_label}</p>
-            <p class="mwp-body" style="font-size:12.5px; color:var(--ink); margin:0 0 6px; line-height:1.4;">${o.description}</p>
+            <p class="mwp-body" style="font-size:12.5px; color:var(--ink); margin:0 0 6px; line-height:1.4; white-space:pre-line;">${String(o.description || '').trim()}</p>
             <p class="mwp-body" style="font-size:11px; color:var(--latte); margin:0;">${macroLine(o.calories, o.protein_g, o.carbs_g, o.fat_g)}</p>
           </div>`).join('')}
       </div>
@@ -101,7 +101,8 @@ function mealOptionsGroup(type, options) {
   const optionsByMeal = {};
   (optionsRes.data || []).forEach((o) => { (optionsByMeal[o.meal_type] ||= []).push(o); });
 
-  const hasMealTargets = Object.keys(mealTargets).length > 0;
+  const macroMealTypes = orderedMealTypes(mealTargets).filter((t) => hasMealMacros(mealTargets[t]));
+  const hasMealTargets = macroMealTypes.length > 0;
   const hasFoods = Object.keys(foodsByCategory).length > 0;
   const hasOptions = Object.keys(optionsByMeal).length > 0;
 
@@ -122,7 +123,7 @@ function mealOptionsGroup(type, options) {
 
     ${hasMealTargets ? `
       <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Per-meal targets</p>
-      ${orderedMealTypes(mealTargets).filter((t) => mealTargets[t]).map((t) => mealTargetCard(t, mealTargets[t])).join('')}
+      ${macroMealTypes.map((t) => mealTargetCard(t, mealTargets[t])).join('')}
       <div style="margin-bottom:0.5rem;"></div>
     ` : ''}
 
