@@ -1,6 +1,6 @@
-# Move With Purpose
+# MOVA
 
-App de cliente (web) conectada a Supabase: login, home, entrenamientos, nutrición, perfil y check-in semanal.
+App de cliente (web) conectada a Supabase: login, home, entrenamientos, nutrición, perfil y check-in semanal. Marca paraguas: "Move With Purpose".
 
 ## 1. Configurar la base de datos
 

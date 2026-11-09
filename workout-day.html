@@ -2,13 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#211E1B" />
+<link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Move With Purpose" />
-<title>Move With Purpose · Workout Day</title>
+<meta name="apple-mobile-web-app-title" content="MOVA" />
+<link rel="apple-touch-icon" href="assets/mova-app-icon.png?v=2" />
+<link rel="icon" href="assets/mova-app-icon.png?v=2" />
+<title>MOVA · Workout Day</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
@@ -19,82 +25,112 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
 <script>
+// target_reps rows are tagged "[Section] detail" (e.g. "[Warm Up] 10 min, pace moderado")
+// since there's no dedicated section column yet. Parse that tag back out for display/grouping.
+function parseTargetReps(targetReps) {
+  const m = /^\[(.+?)\]\s*(.*)$/.exec(targetReps || '');
+  return m ? { section: m[1], detail: m[2] } : { section: 'Workout', detail: targetReps || '' };
+}
+
 (async () => {
   const session = await requireSession();
   if (!session) return;
   const userId = session.user.id;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const dayId = new URLSearchParams(window.location.search).get('day');
+  const workoutId = new URLSearchParams(window.location.search).get('workout');
   const card = document.getElementById('card');
 
-  const { data: day, error } = await sb
-    .from('workout_days')
-    .select('id, day_number, name, workout_sections(id, name, order_index, exercises(id, name, order_index, target_sets, target_reps, video_url, image_url))')
-    .eq('id', dayId)
+  const { data: workout, error } = await sb
+    .from('workouts')
+    .select('id, name, workout_exercises(id, sets, target_reps, order_index, exercises(id, name, video_url, image_url))')
+    .eq('id', workoutId)
+    .eq('client_id', userId)
     .single();
 
-  if (error || !day) {
-    card.innerHTML = '<p class="mwp-loading">Workout day not found.</p>';
+  if (error || !workout) {
+    card.innerHTML = '<p class="mwp-loading">Workout not found.</p>';
     return;
   }
 
   const { data: todayLogs } = await sb
     .from('exercise_logs')
-    .select('exercise_id, set_number')
+    .select('workout_exercise_id, set_number')
     .eq('user_id', userId)
-    .gte('logged_at', todayStr + 'T00:00:00');
+    .not('workout_exercise_id', 'is', null);
 
-  const setsLoggedByExercise = {};
+  const setsLoggedByWE = {};
   (todayLogs || []).forEach((l) => {
-    setsLoggedByExercise[l.exercise_id] = Math.max(setsLoggedByExercise[l.exercise_id] || 0, l.set_number);
+    setsLoggedByWE[l.workout_exercise_id] = Math.max(setsLoggedByWE[l.workout_exercise_id] || 0, l.set_number);
   });
 
-  const sections = [...day.workout_sections].sort((a, b) => a.order_index - b.order_index);
+  const items = [...workout.workout_exercises]
+    .sort((a, b) => a.order_index - b.order_index)
+    .map((we) => ({ ...we, ...parseTargetReps(we.target_reps) }));
 
-  function exerciseRow(ex) {
-    const setsDone = setsLoggedByExercise[ex.id] || 0;
-    const complete = setsDone >= ex.target_sets;
-    const mediaIcon = ex.video_url
-      ? '<i class="ti ti-video" style="font-size:15px; color:#C4BEB4;" aria-hidden="true"></i>'
-      : ex.image_url
-        ? '<i class="ti ti-photo" style="font-size:15px; color:#C4BEB4;" aria-hidden="true"></i>'
+  const sectionOrder = ['Warm Up', 'Workout', 'Core', 'Cardio'];
+  const sections = sectionOrder
+    .map((name) => ({ name, items: items.filter((it) => it.section === name) }))
+    .filter((s) => s.items.length);
+  // Catch any section name that doesn't match the known set, appended at the end.
+  const knownNames = new Set(sectionOrder);
+  const extraSections = [...new Set(items.filter((it) => !knownNames.has(it.section)).map((it) => it.section))]
+    .map((name) => ({ name, items: items.filter((it) => it.section === name) }));
+  const allSections = [...sections, ...extraSections];
+
+  const exercisesDone = items.filter((it) => (setsLoggedByWE[it.id] || 0) >= it.sets).length;
+
+  function exerciseRow(it) {
+    const setsDone = setsLoggedByWE[it.id] || 0;
+    const complete = setsDone >= it.sets;
+    const isCardio = it.section === 'Cardio' || it.section === 'Warm Up';
+    const detail = isCardio ? it.detail : `${it.sets} sets × ${it.detail}`;
+    const mediaIcon = it.exercises.video_url
+      ? '<i class="ti ti-video" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>'
+      : it.exercises.image_url
+        ? '<i class="ti ti-photo" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>'
         : '';
     return `
-      <a href="workout-exercise.html?exercise=${ex.id}&day=${day.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:12px; padding:14px 16px;">
-        <div>
-          <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E; text-transform:uppercase;">${ex.name}</p>
-          <p class="mwp-body" style="font-size:12px; color:#8F867E; margin:2px 0 0; opacity:0.7;">${ex.target_sets} sets × ${ex.target_reps} reps</p>
+      <a href="workout-exercise.html?we=${it.id}&workout=${workout.id}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:var(--creme); border-radius:12px; padding:14px 16px;">
+        <i class="ti ti-video" style="font-size:17px; color:var(--latte); flex-shrink:0;" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${it.exercises.name}</p>
+          <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${detail}</p>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           ${mediaIcon}
           ${complete
-            ? '<i class="ti ti-circle-check" style="font-size:19px; color:#8F867E;" aria-hidden="true"></i>'
-            : `<span class="mwp-body" style="font-size:12px; color:#8F867E; opacity:0.6;">${setsDone}/${ex.target_sets}</span>`}
+            ? '<i class="ti ti-circle-check" style="font-size:19px; color:var(--ink);" aria-hidden="true"></i>'
+            : `<span class="mwp-body" style="font-size:12px; color:var(--latte);">${setsDone}/${it.sets}</span>`}
         </div>
       </a>`;
   }
 
   card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:1.2rem;">
-      <a href="workout.html" style="line-height:0;"><i class="ti ti-chevron-left" style="font-size:20px; color:#8F867E;" aria-hidden="true"></i></a>
-      <div>
-        <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 3px; text-transform:uppercase; opacity:0.7;">Day ${day.day_number}</p>
-        <p class="mwp-title" style="font-size:22px; margin:0; color:#8F867E; text-transform:uppercase;">${day.name}</p>
-      </div>
-    </div>
+    <div id="headerSlot"></div>
+    <a href="workout.html" style="display:inline-flex; align-items:center; gap:5px; text-decoration:none; margin-bottom:1rem;">
+      <i class="ti ti-chevron-left" style="font-size:15px; color:var(--latte);" aria-hidden="true"></i>
+      <span class="mwp-body" style="font-size:12px; color:var(--latte);">Training split</span>
+    </a>
+
+    <p class="mwp-label" style="font-size:11px; color:var(--latte); margin:0 0 1.2rem;">Workout Progress &nbsp;·&nbsp; ${exercisesDone} / ${items.length}</p>
 
     <div style="display:flex; flex-direction:column; gap:18px;">
-      ${sections.map((sec) => `
+      ${allSections.map((sec) => `
         <div>
-          <p class="mwp-body" style="font-size:12px; font-weight:600; letter-spacing:0.8px; color:#8F867E; margin:0 0 8px; text-transform:uppercase;">${sec.name}</p>
+          <p class="mwp-label" style="font-size:12px; color:var(--creme); margin:0 0 8px;">${sec.name}</p>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            ${[...sec.exercises].sort((a, b) => a.order_index - b.order_index).map(exerciseRow).join('')}
+            ${sec.items.map(exerciseRow).join('')}
           </div>
         </div>
       `).join('')}
     </div>
+
+    <div data-bottom-nav></div>
   `;
+
+  renderHeader(document.getElementById('headerSlot'), { userId, title: workout.name });
+  renderBottomNav('workout');
 })();
 </script>
 </body>

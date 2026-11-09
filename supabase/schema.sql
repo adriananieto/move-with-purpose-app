@@ -1,4 +1,4 @@
--- Move With Purpose — database schema
+-- MOVA — database schema
 -- Run this in Supabase: Dashboard → SQL Editor → New query → paste → Run
 -- Safe to re-run: it drops any existing objects first, then recreates everything.
 -- NOTE: re-running this wipes all workout/nutrition/checkin data (fresh start).
@@ -39,6 +39,7 @@ create table public.profiles (
   plan_tier text not null default 'Premium',
   role text not null default 'client' check (role in ('client','coach')),
   member_since date not null default current_date,
+  phase_start_date date not null default current_date,
   created_at timestamptz not null default now()
 );
 
@@ -89,7 +90,7 @@ create table public.body_weight_logs (
   user_id uuid not null references public.profiles(id) on delete cascade,
   weight_lb numeric not null,
   body_fat_pct numeric,
-  muscle_mass_pct numeric,
+  muscle_mass_lb numeric,
   logged_at date not null default current_date,
   created_at timestamptz not null default now()
 );
@@ -238,7 +239,7 @@ create table public.checkins (
   week_number int not null,
   fasting_weight_lb numeric,
   body_fat_pct numeric,
-  muscle_mass_pct numeric,
+  muscle_mass_lb numeric,
   hunger_level int check (hunger_level between 1 and 5),
   energy_level int check (energy_level between 1 and 5),
   adherence_level int check (adherence_level between 1 and 5),
@@ -268,8 +269,12 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', 'New Member'));
+  insert into public.profiles (id, full_name, plan_tier)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', 'New Member'),
+    coalesce(new.raw_user_meta_data->>'plan_tier', 'Premium')
+  );
 
   insert into public.nutrition_targets (user_id) values (new.id);
 
