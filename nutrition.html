@@ -26,22 +26,28 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/viewAs.js"></script>
+<script src="js/meals.js"></script>
 <script>
 const MEAL_ICONS = { breakfast: 'ti-sun', snack_am: 'ti-coffee', lunch: 'ti-sun-high', snack_pm: 'ti-cookie', dinner: 'ti-moon' };
-const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Snack AM', lunch: 'Lunch', snack_pm: 'Snack PM', dinner: 'Dinner' };
-const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
 
 (async () => {
   const session = await requireSession();
   if (!session) return;
-  const userId = session.user.id;
+  const { userId, isReadOnly, viewAsName } = resolveViewer(session);
+  renderViewAsBanner(viewAsName);
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  const [profileRes, targetRes, logsRes] = await Promise.all([
+  const [profileRes, targetRes, logsRes, mealTargetsRes] = await Promise.all([
     sb.from('profiles').select('extended_tracking').eq('id', userId).single(),
     sb.from('nutrition_targets').select('*').eq('user_id', userId).single(),
     sb.from('meal_logs').select('*').eq('user_id', userId).eq('logged_at', todayStr),
+    sb.from('meal_targets').select('meal_type, label, sort_order').eq('user_id', userId),
   ]);
+
+  const mealTargets = {};
+  (mealTargetsRes.data || []).forEach((t) => { mealTargets[t.meal_type] = t; });
+  const mealOrder = orderedMealTypes(mealTargets);
 
   const isExtended = !!profileRes.data?.extended_tracking;
   const extras = isExtended ? (await sb.from('profile_extras').select('*').eq('user_id', userId).maybeSingle()).data : null;
@@ -88,7 +94,7 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
       <a href="log-meal.html?type=${type}" style="text-decoration:none; display:flex; align-items:center; gap:12px; background:var(--creme); border-radius:12px; padding:13px 14px;">
         <i class="ti ${MEAL_ICONS[type]}" style="font-size:18px; color:var(--ink);" aria-hidden="true"></i>
         <div style="flex:1;">
-          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${MEAL_LABELS[type]}</p>
+          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">${mealLabel(type, mealTargets)}</p>
         </div>
         ${done
           ? '<i class="ti ti-check" style="font-size:17px; color:var(--ink);" aria-hidden="true"></i>'
@@ -139,7 +145,7 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
 
       <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Meals</p>
       <div style="display:flex; flex-direction:column; gap:8px;">
-        ${MEAL_ORDER.map(mealRow).join('')}
+        ${mealOrder.map(mealRow).join('')}
       </div>
 
       ${isExtended && (extras?.preferred_foods?.length || extras?.avoid_foods) ? `
@@ -153,6 +159,7 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
 
     renderHeader(document.getElementById('headerSlot'), { userId, title: 'Nutrition' });
     renderBottomNav('nutrition');
+    if (isReadOnly) lockReadOnly(document.getElementById('card'));
 
     if (isExtended) {
       document.querySelectorAll('.daytype-btn').forEach((btn) => {

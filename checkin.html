@@ -30,8 +30,9 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/viewAs.js"></script>
 <script>
-let userId, weekNumber, isExtended;
+let userId, isReadOnly, weekNumber, isExtended;
 const state = {
   hunger: null, energy: null, adherence: null, stress: null, sleep: null,
   weight: '', bodyFat: '', muscleMass: '', feedback: '',
@@ -267,7 +268,10 @@ async function submit() {
 (async () => {
   const session = await requireSession();
   if (!session) return;
-  userId = session.user.id;
+  const viewer = resolveViewer(session);
+  userId = viewer.userId;
+  isReadOnly = viewer.isReadOnly;
+  renderViewAsBanner(viewer.viewAsName);
 
   const [phaseStartDate, profileRes] = await Promise.all([
     getPhaseStartDate(userId),
@@ -277,6 +281,7 @@ async function submit() {
   isExtended = !!profileRes.data?.extended_tracking;
 
   render();
+  if (isReadOnly) lockReadOnly(document.getElementById('card'));
 })();
 </script>
 </body>

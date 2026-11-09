@@ -26,6 +26,7 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/viewAs.js"></script>
 <script>
 // target_reps rows are tagged "[Section] detail" (e.g. "[Warm Up] 10 min, pace moderado")
 // since there's no dedicated section column yet. Parse that tag back out for display/grouping.
@@ -37,7 +38,8 @@ function parseTargetReps(targetReps) {
 (async () => {
   const session = await requireSession();
   if (!session) return;
-  const userId = session.user.id;
+  const { userId, isReadOnly, viewAsName } = resolveViewer(session);
+  renderViewAsBanner(viewAsName);
   const workoutId = new URLSearchParams(window.location.search).get('workout');
   const card = document.getElementById('card');
 
@@ -131,6 +133,7 @@ function parseTargetReps(targetReps) {
 
   renderHeader(document.getElementById('headerSlot'), { userId, title: workout.name });
   renderBottomNav('workout');
+  if (isReadOnly) lockReadOnly(card);
 })();
 </script>
 </body>

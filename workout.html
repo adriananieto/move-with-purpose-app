@@ -26,11 +26,13 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/viewAs.js"></script>
 <script>
 (async () => {
   const session = await requireSession();
   if (!session) return;
-  const userId = session.user.id;
+  const { userId, isReadOnly, viewAsName } = resolveViewer(session);
+  renderViewAsBanner(viewAsName);
   const card = document.getElementById('card');
 
   const { data: workouts, error } = await sb
@@ -87,6 +89,7 @@
 
   renderHeader(document.getElementById('headerSlot'), { userId, title: 'Training Split' });
   renderBottomNav('workout');
+  if (isReadOnly) lockReadOnly(card);
 })();
 </script>
 </body>

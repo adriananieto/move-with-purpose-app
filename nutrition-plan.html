@@ -26,9 +26,10 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/viewAs.js"></script>
+<script src="js/meals.js"></script>
 <script>
-const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Snack AM', lunch: 'Lunch', snack_pm: 'Snack PM', dinner: 'Dinner' };
-const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
+let mealTargets = {};
 
 function macroLine(calories, protein, carbs, fat) {
   const parts = [];
@@ -42,7 +43,7 @@ function macroLine(calories, protein, carbs, fat) {
 function mealTargetCard(type, t) {
   return `
     <div style="background:var(--creme); border-radius:12px; padding:13px 14px; margin-bottom:8px;">
-      <p class="mwp-title" style="font-size:14px; margin:0 0 3px; color:var(--ink);">${MEAL_LABELS[type]}</p>
+      <p class="mwp-title" style="font-size:14px; margin:0 0 3px; color:var(--ink);">${mealLabel(type, mealTargets)}</p>
       <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:0;">${macroLine(t.calories, t.protein_g, t.carbs_g, t.fat_g)}</p>
     </div>`;
 }
@@ -64,7 +65,7 @@ function foodGroup(category, foods) {
 function mealOptionsGroup(type, options) {
   return `
     <div style="margin-bottom:14px;">
-      <p class="mwp-label" style="font-size:10px; color:var(--creme); margin:0 0 7px;">${MEAL_LABELS[type]}</p>
+      <p class="mwp-label" style="font-size:10px; color:var(--creme); margin:0 0 7px;">${mealLabel(type, mealTargets)}</p>
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${options.map((o) => `
           <div style="background:var(--creme); border-radius:12px; padding:13px 14px;">
@@ -79,7 +80,8 @@ function mealOptionsGroup(type, options) {
 (async () => {
   const session = await requireSession();
   if (!session) return;
-  const userId = session.user.id;
+  const { userId, isReadOnly, viewAsName } = resolveViewer(session);
+  renderViewAsBanner(viewAsName);
   const card = document.getElementById('card');
 
   const [targetRes, mealTargetsRes, foodsRes, optionsRes] = await Promise.all([
@@ -90,7 +92,7 @@ function mealOptionsGroup(type, options) {
   ]);
 
   const target = targetRes.data;
-  const mealTargets = {};
+  mealTargets = {};
   (mealTargetsRes.data || []).forEach((t) => { mealTargets[t.meal_type] = t; });
 
   const foodsByCategory = {};
@@ -120,7 +122,7 @@ function mealOptionsGroup(type, options) {
 
     ${hasMealTargets ? `
       <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:0 0 9px;">Per-meal targets</p>
-      ${MEAL_ORDER.filter((t) => mealTargets[t]).map((t) => mealTargetCard(t, mealTargets[t])).join('')}
+      ${orderedMealTypes(mealTargets).filter((t) => mealTargets[t]).map((t) => mealTargetCard(t, mealTargets[t])).join('')}
       <div style="margin-bottom:0.5rem;"></div>
     ` : ''}
 
@@ -131,7 +133,7 @@ function mealOptionsGroup(type, options) {
 
     ${hasOptions ? `
       <p class="mwp-label" style="font-size:11px; color:var(--creme); margin:1.1rem 0 9px;">Meal options</p>
-      ${MEAL_ORDER.filter((t) => optionsByMeal[t]).map((t) => mealOptionsGroup(t, optionsByMeal[t])).join('')}
+      ${orderedMealTypes(mealTargets).filter((t) => optionsByMeal[t]).map((t) => mealOptionsGroup(t, optionsByMeal[t])).join('')}
     ` : ''}
 
     ${!hasMealTargets && !hasFoods && !hasOptions ? `
@@ -143,6 +145,7 @@ function mealOptionsGroup(type, options) {
 
   renderHeader(document.getElementById('headerSlot'), { userId, title: 'Nutrition Plan' });
   renderBottomNav('nutrition');
+  if (isReadOnly) lockReadOnly(card);
 })();
 </script>
 </body>

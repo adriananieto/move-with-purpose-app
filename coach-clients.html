@@ -26,6 +26,7 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/viewAs.js"></script>
 <script>
 (async () => {
   const session = await requireSession();
@@ -69,6 +70,7 @@
           <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">${c.full_name}</p>
           <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${lastText}</p>
         </div>
+        <button type="button" data-view-as="${c.id}" data-view-as-name="${c.full_name}" style="all:unset; cursor:pointer; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="View as client"><i class="ti ti-eye" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></button>
         <a href="coach-client-plan.html?client=${c.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="Plan"><i class="ti ti-clipboard-list" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></a>
         <a href="coach-checkins.html?client=${c.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="Check-ins"><i class="ti ti-chevron-right" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></a>
       </div>`;
@@ -89,6 +91,10 @@
   `;
 
   renderHeader(document.getElementById('headerSlot'), { title: 'Clients' });
+
+  document.querySelectorAll('[data-view-as]').forEach((btn) => {
+    btn.addEventListener('click', () => startViewAsClient(btn.dataset.viewAs, btn.dataset.viewAsName));
+  });
 })();
 </script>
 </body>
