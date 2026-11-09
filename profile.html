@@ -81,6 +81,9 @@ async function loadAndRender() {
   const weightLogs = weightRes.data || [];
   const photos = photosRes.data || [];
 
+  const isExtended = !!profile.extended_tracking;
+  const extras = isExtended ? (await sb.from('profile_extras').select('*').eq('user_id', userId).maybeSingle()).data : null;
+
   const current = weightLogs.length ? Number(weightLogs[weightLogs.length - 1].weight_lb) : null;
   const first = weightLogs.length ? Number(weightLogs[0].weight_lb) : null;
   const change = current !== null && first !== null ? (current - first).toFixed(1) : null;
@@ -113,6 +116,23 @@ async function loadAndRender() {
         ${statTile(latestBodyFat ? latestBodyFat.body_fat_pct + '%' : '—', 'Body Fat')}
         ${statTile(latestMuscle ? latestMuscle.muscle_mass_pct + '%' : '—', 'Muscle Mass')}
       </div>
+    ` : ''}
+
+    ${isExtended && extras && (extras.goals?.length || extras.goal_weight_lb != null || extras.goal_body_fat_pct != null) ? `
+      <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Goals</p>
+      ${extras.goals?.length ? `
+        <ul style="margin:0 0 9px; padding:0 0 0 18px; color:#8F867E;" class="mwp-body">
+          ${extras.goals.map((g) => `<li style="font-size:12.5px; margin-bottom:3px;">${g}</li>`).join('')}
+        </ul>` : ''}
+      ${(extras.goal_weight_lb !== null && extras.goal_weight_lb !== undefined) || (extras.goal_body_fat_pct !== null && extras.goal_body_fat_pct !== undefined) ? `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:9px; margin-bottom:1.3rem;">
+          ${extras.goal_weight_lb !== null && extras.goal_weight_lb !== undefined
+            ? statTile(extras.goal_weight_lb + ' lb' + (current !== null ? ` (${(extras.goal_weight_lb - current > 0 ? '+' : '') + (extras.goal_weight_lb - current).toFixed(1)})` : ''), 'Goal Weight')
+            : ''}
+          ${extras.goal_body_fat_pct !== null && extras.goal_body_fat_pct !== undefined
+            ? statTile(extras.goal_body_fat_pct + '%' + (latestBodyFat ? ` (${(extras.goal_body_fat_pct - latestBodyFat.body_fat_pct > 0 ? '+' : '') + (extras.goal_body_fat_pct - latestBodyFat.body_fat_pct).toFixed(1)})` : ''), 'Goal Body Fat')
+            : ''}
+        </div>` : ''}
     ` : ''}
 
     <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Body Weight</p>

@@ -31,13 +31,31 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
   const userId = session.user.id;
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  const [targetRes, logsRes] = await Promise.all([
+  const [profileRes, targetRes, logsRes] = await Promise.all([
+    sb.from('profiles').select('extended_tracking').eq('id', userId).single(),
     sb.from('nutrition_targets').select('*').eq('user_id', userId).single(),
     sb.from('meal_logs').select('*').eq('user_id', userId).eq('logged_at', todayStr),
   ]);
 
-  const target = targetRes.data || { calories: 1800, protein_g: 130, carbs_g: 180, fat_g: 60 };
+  const isExtended = !!profileRes.data?.extended_tracking;
+  const extras = isExtended ? (await sb.from('profile_extras').select('*').eq('user_id', userId).maybeSingle()).data : null;
+
+  const dayTypeKey = `mwp_daytype:${userId}:${todayStr}`;
+  let dayType = localStorage.getItem(dayTypeKey) || 'training';
+
+  const baseTarget = targetRes.data || { calories: 1800, protein_g: 130, carbs_g: 180, fat_g: 60 };
   const logs = logsRes.data || [];
+
+  function targetForDayType(type) {
+    if (!extras) return baseTarget;
+    const prefix = type === 'training' ? 'tr' : 'rest';
+    return {
+      calories: extras[`${prefix}_kcal`] ?? baseTarget.calories,
+      protein_g: extras[`${prefix}_protein_g`] ?? baseTarget.protein_g,
+      carbs_g: extras[`${prefix}_carbs_g`] ?? baseTarget.carbs_g,
+      fat_g: extras[`${prefix}_fat_g`] ?? baseTarget.fat_g,
+    };
+  }
 
   const totals = logs.reduce((acc, l) => ({
     calories: acc.calories + (l.total_calories || 0),
@@ -47,10 +65,7 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
   }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
 
   const loggedMealTypes = new Set(logs.map((l) => l.meal_type));
-
   const circumference = 188;
-  const calPct = Math.min(totals.calories / target.calories, 1);
-  const dashOffset = Math.round(circumference * (1 - calPct));
 
   function bar(label, value, max) {
     const pct = Math.min(Math.round((value / max) * 100), 100);
@@ -75,37 +90,72 @@ const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
       </a>`;
   }
 
-  document.getElementById('card').innerHTML = `
-    <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Today</p>
-    <p class="mwp-title" style="font-size:26px; margin:0 0 1.3rem; color:#8F867E; text-transform:uppercase;">Nutrition</p>
+  function daytypeBtn(type, label) {
+    const active = dayType === type;
+    return `<div class="daytype-btn ${active ? 'active' : ''}" data-type="${type}" style="flex:1; text-align:center; padding:8px 0; border-radius:7px; font-size:12px; font-family:'Work Sans',sans-serif; cursor:pointer; ${active ? 'background:#8F867E; color:#FFFFFF;' : 'background:#FFFFFF; color:#8F867E; border:0.5px solid rgba(0,0,0,0.08);'}">${label}</div>`;
+  }
 
-    <div style="display:flex; align-items:center; gap:1.1rem; margin-bottom:1.3rem;">
-      <div style="position:relative; width:82px; height:82px; flex-shrink:0;">
-        <svg viewBox="0 0 72 72" style="width:82px; height:82px; transform:rotate(-90deg);">
-          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="6"/>
-          <circle cx="36" cy="36" r="30" fill="none" stroke="#8F867E" stroke-width="6" stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round"/>
-        </svg>
-        <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-          <span class="mwp-title" style="font-size:15px; color:#8F867E;">${totals.calories}</span>
-          <span class="mwp-body" style="font-size:9px; color:#8F867E;">/ ${target.calories}</span>
+  function draw() {
+    const target = targetForDayType(dayType);
+    const calPct = Math.min(totals.calories / target.calories, 1);
+    const dashOffset = Math.round(circumference * (1 - calPct));
+
+    document.getElementById('card').innerHTML = `
+      <p class="mwp-body" style="font-size:11px; font-weight:500; letter-spacing:1.5px; color:#8F867E; margin:0 0 4px; text-transform:uppercase;">Today</p>
+      <p class="mwp-title" style="font-size:26px; margin:0 0 1.3rem; color:#8F867E; text-transform:uppercase;">Nutrition</p>
+
+      ${isExtended ? `
+        <div style="display:flex; gap:8px; margin-bottom:1.1rem;">
+          ${daytypeBtn('training', 'Training Day')}
+          ${daytypeBtn('rest', 'Rest Day')}
+        </div>` : ''}
+
+      <div style="display:flex; align-items:center; gap:1.1rem; margin-bottom:1.3rem;">
+        <div style="position:relative; width:82px; height:82px; flex-shrink:0;">
+          <svg viewBox="0 0 72 72" style="width:82px; height:82px; transform:rotate(-90deg);">
+            <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="6"/>
+            <circle cx="36" cy="36" r="30" fill="none" stroke="#8F867E" stroke-width="6" stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <span class="mwp-title" style="font-size:15px; color:#8F867E;">${totals.calories}</span>
+            <span class="mwp-body" style="font-size:9px; color:#8F867E;">/ ${target.calories}</span>
+          </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+          ${bar('Protein', totals.protein_g, target.protein_g)}
+          ${bar('Carbs', totals.carbs_g, target.carbs_g)}
+          ${bar('Fat', totals.fat_g, target.fat_g)}
         </div>
       </div>
-      <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
-        ${bar('Protein', totals.protein_g, target.protein_g)}
-        ${bar('Carbs', totals.carbs_g, target.carbs_g)}
-        ${bar('Fat', totals.fat_g, target.fat_g)}
+
+      <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Meals</p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${MEAL_ORDER.map(mealRow).join('')}
       </div>
-    </div>
 
-    <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 9px; text-transform:uppercase;">Meals</p>
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      ${MEAL_ORDER.map(mealRow).join('')}
-    </div>
+      ${isExtended && (extras?.preferred_foods?.length || extras?.avoid_foods) ? `
+        <div style="margin-top:1.1rem; display:flex; flex-direction:column; gap:7px;">
+          ${extras.preferred_foods?.length ? `<p class="mwp-body" style="font-size:11.5px; color:#8F867E; margin:0;"><strong>Preferred:</strong> ${extras.preferred_foods.join(', ')}</p>` : ''}
+          ${extras.avoid_foods ? `<p class="mwp-body" style="font-size:11.5px; color:#8F867E; margin:0;"><strong>Avoid:</strong> ${extras.avoid_foods}</p>` : ''}
+        </div>` : ''}
 
-    <div data-bottom-nav></div>
-  `;
+      <div data-bottom-nav></div>
+    `;
 
-  renderBottomNav('nutrition');
+    renderBottomNav('nutrition');
+
+    if (isExtended) {
+      document.querySelectorAll('.daytype-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          dayType = btn.dataset.type;
+          localStorage.setItem(dayTypeKey, dayType);
+          draw();
+        });
+      });
+    }
+  }
+
+  draw();
 })();
 </script>
 </body>

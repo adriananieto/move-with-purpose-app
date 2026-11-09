@@ -53,7 +53,7 @@ function scoreRow(label, value) {
   }
 
   const [clientRes, historyRes, photosRes] = await Promise.all([
-    sb.from('profiles').select('full_name').eq('id', checkin.user_id).single(),
+    sb.from('profiles').select('full_name, extended_tracking').eq('id', checkin.user_id).single(),
     sb.from('checkins').select('id, fasting_weight_lb, submitted_at').eq('user_id', checkin.user_id).order('submitted_at', { ascending: true }),
     sb.from('progress_photos').select('storage_path').eq('user_id', checkin.user_id).eq('taken_at', checkin.submitted_at.slice(0, 10)),
   ]);
@@ -61,6 +61,15 @@ function scoreRow(label, value) {
   const client = clientRes.data || { full_name: 'Client' };
   const history = historyRes.data || [];
   const photos = photosRes.data || [];
+  const isExtended = !!client.extended_tracking;
+
+  function tile(value, unit, label) {
+    return `
+      <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:9px; padding:10px; text-align:center;">
+        <p class="mwp-title" style="font-size:14px; margin:0; color:#8F867E;">${value !== null && value !== undefined ? value + unit : '—'}</p>
+        <p class="mwp-body" style="font-size:9px; color:#8F867E; margin:2px 0 0; text-transform:uppercase;">${label}</p>
+      </div>`;
+  }
 
   const idx = history.findIndex((h) => h.id === checkin.id);
   const prev = idx > 0 ? history[idx - 1] : null;
@@ -100,6 +109,30 @@ function scoreRow(label, value) {
         </div>
       </div>` : ''}
 
+    ${isExtended && [checkin.fat_mass_lb, checkin.fat_free_mass_lb, checkin.muscle_mass_lb, checkin.skeletal_muscle_pct, checkin.visceral_fat, checkin.metabolic_age, checkin.bmr_kcal, checkin.body_water_pct].some((v) => v !== null && v !== undefined) ? `
+      <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Extended body composition</p>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:0.9rem;">
+        ${tile(checkin.fat_mass_lb, ' lb', 'Fat Mass')}
+        ${tile(checkin.fat_free_mass_lb, ' lb', 'Fat-Free Mass')}
+        ${tile(checkin.muscle_mass_lb, ' lb', 'Muscle Mass')}
+        ${tile(checkin.skeletal_muscle_pct, '%', 'Skeletal Muscle')}
+        ${tile(checkin.visceral_fat, '', 'Visceral Fat')}
+        ${tile(checkin.metabolic_age, '', 'Metabolic Age')}
+        ${tile(checkin.bmr_kcal, '', 'BMR kcal')}
+        ${tile(checkin.body_water_pct, '%', 'Body Water')}
+      </div>` : ''}
+
+    ${isExtended && [checkin.waist_in, checkin.hip_in, checkin.bust_in, checkin.arm_in, checkin.thigh_in].some((v) => v !== null && v !== undefined) ? `
+      <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">Measurements</p>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:0.9rem;">
+        ${tile(checkin.waist_in, '"', 'Waist')}
+        ${tile(checkin.hip_in, '"', 'Hip')}
+        ${tile(checkin.bust_in, '"', 'Bust')}
+        ${tile(checkin.arm_in, '"', 'Arm')}
+        ${tile(checkin.thigh_in, '"', 'Thigh')}
+        ${tile(checkin.waist_hip_ratio, '', 'Waist/Hip Ratio')}
+      </div>` : ''}
+
     ${photos.length ? `
       <div style="display:grid; grid-template-columns: repeat(${photos.length}, 1fr); gap:7px; margin-bottom:0.9rem;">
         ${photos.map((p) => `<div style="aspect-ratio:3/4; background:#FFFFFF; border-radius:9px; overflow:hidden;"><img src="${sb.storage.from('photos').getPublicUrl(p.storage_path).data.publicUrl}" style="width:100%; height:100%; object-fit:cover;" /></div>`).join('')}
@@ -109,8 +142,15 @@ function scoreRow(label, value) {
       ${scoreRow('Hunger', checkin.hunger_level)}
       ${scoreRow('Energy', checkin.energy_level)}
       ${scoreRow('Plan adherence', checkin.adherence_level)}
-      ${scoreRow('Stress / sleep', checkin.stress_level)}
+      ${scoreRow(isExtended ? 'Stress' : 'Stress / sleep', checkin.stress_level)}
+      ${isExtended ? scoreRow('Sleep quality', checkin.sleep_level) : ''}
     </div>
+
+    ${isExtended && (checkin.sessions_completed !== null || checkin.sessions_planned !== null) ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:9px; padding:10px 13px; margin-bottom:1rem;">
+        <span class="mwp-body" style="font-size:12.5px; color:#8F867E;">Sessions this week</span>
+        <span class="mwp-title" style="font-size:13px; color:#8F867E;">${checkin.sessions_completed ?? '—'} / ${checkin.sessions_planned ?? '—'}</span>
+      </div>` : ''}
 
     <p class="mwp-body" style="font-size:11px; font-weight:600; letter-spacing:0.5px; color:#8F867E; margin:0 0 7px; text-transform:uppercase;">General feedback</p>
     <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:10px; padding:12px 13px; margin-bottom:1.1rem;">
