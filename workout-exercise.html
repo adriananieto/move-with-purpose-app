@@ -25,7 +25,7 @@ let userId, dayId, orderedExercises, current, todayStr;
 async function loadDay() {
   const { data: day, error } = await sb
     .from('workout_days')
-    .select('id, day_number, name, workout_sections(id, order_index, exercises(id, name, order_index, target_sets, target_reps, video_url))')
+    .select('id, day_number, name, workout_sections(id, order_index, exercises(id, name, order_index, target_sets, target_reps, video_url, description, image_url))')
     .eq('id', dayId)
     .single();
 
@@ -85,13 +85,22 @@ function render() {
       <span style="width:20px;"></span>
     </div>
 
-    <div style="background:#FFFFFF; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; aspect-ratio:4/3; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
+    <div style="background:${!current.video_url && current.image_url ? '#2B2520' : '#FFFFFF'}; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; aspect-ratio:4/3; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
       ${current.video_url
         ? `<video src="${current.video_url}" controls style="width:100%; height:100%; border-radius:14px; object-fit:cover;"></video>`
-        : '<i class="ti ti-video" style="font-size:34px; color:#C4BEB4;" aria-hidden="true"></i>'}
+        : current.image_url
+          ? `<img src="${current.image_url}" alt="${current.name}" style="width:100%; height:100%; border-radius:14px; object-fit:contain;" />`
+          : '<i class="ti ti-video" style="font-size:34px; color:#C4BEB4;" aria-hidden="true"></i>'}
     </div>
 
     <p class="mwp-title" style="font-size:22px; margin:0 0 4px; color:#8F867E; text-transform:uppercase; letter-spacing:0.3px;">${current.name}</p>
+    ${current.description ? `
+    <button type="button" id="howToToggle" style="all:unset; cursor:pointer; display:flex; align-items:center; gap:4px; margin:0 0 6px;">
+      <span class="mwp-body" style="font-size:10px; font-weight:600; letter-spacing:1px; color:#8F867E; text-transform:uppercase;">How to</span>
+      <i class="ti ti-chevron-down" id="howToChevron" style="font-size:12px; color:#8F867E;" aria-hidden="true"></i>
+    </button>
+    <p id="howToText" class="mwp-body" style="font-size:13px; color:#8F867E; line-height:1.5; margin:0 0 10px; display:none;">${current.description}</p>
+    ` : ''}
     <p class="mwp-body" style="font-size:13px; color:#8F867E; margin:0 0 1.2rem;">Set ${current.currentSet} of ${current.target_sets} · target ${current.target_reps} reps</p>
 
     <div style="background:#8F867E; border-radius:12px; padding:14px; margin-bottom:12px;">
@@ -115,6 +124,16 @@ function render() {
   `;
 
   document.getElementById('saveBtn').addEventListener('click', saveSet);
+
+  if (current.description) {
+    document.getElementById('howToToggle').addEventListener('click', () => {
+      const text = document.getElementById('howToText');
+      const chevron = document.getElementById('howToChevron');
+      const expanded = text.style.display !== 'none';
+      text.style.display = expanded ? 'none' : 'block';
+      chevron.className = expanded ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
+    });
+  }
 }
 
 function renderNotFound() {

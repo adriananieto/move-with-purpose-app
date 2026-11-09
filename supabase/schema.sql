@@ -138,7 +138,9 @@ create table public.exercises (
   order_index int not null,
   target_sets int not null,
   target_reps int not null,
-  video_url text
+  video_url text,
+  description text,
+  image_url text
 );
 
 alter table public.workout_days enable row level security;
