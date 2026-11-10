@@ -25,6 +25,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/phase.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/viewAs.js"></script>
 <script>
@@ -46,7 +47,7 @@
   }
 
   const [clientsRes, checkinsRes] = await Promise.all([
-    sb.from('profiles').select('id, full_name, member_since').neq('id', userId).order('full_name'),
+    sb.from('profiles').select('id, full_name, member_since, paused_since, paused_days').neq('id', userId).order('full_name'),
     sb.from('checkins').select('user_id, submitted_at').order('submitted_at', { ascending: false }),
   ]);
 
@@ -67,9 +68,12 @@
           <span class="mwp-title" style="font-size:13px; color:var(--ink);">${c.full_name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('')}</span>
         </div>
         <div style="flex:1;">
-          <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">${c.full_name}</p>
+          <p class="mwp-title" style="font-size:15px; margin:0; color:var(--ink);">${c.full_name}${c.paused_since ? ' <span class="mwp-label" style="font-size:9px; background:var(--ink); color:var(--creme); border-radius:6px; padding:3px 7px; margin-left:4px; vertical-align:middle;">Paused</span>' : ''}</p>
           <p class="mwp-body" style="font-size:12px; color:var(--latte); margin:2px 0 0;">${lastText}</p>
         </div>
+        ${c.paused_since
+          ? `<button type="button" data-resume="${c.id}" style="all:unset; cursor:pointer; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="Resume program"><i class="ti ti-player-play" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></button>`
+          : `<button type="button" data-pause="${c.id}" style="all:unset; cursor:pointer; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="Pause program"><i class="ti ti-player-pause" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></button>`}
         <button type="button" data-view-as="${c.id}" data-view-as-name="${c.full_name}" style="all:unset; cursor:pointer; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="View as client"><i class="ti ti-eye" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></button>
         <a href="coach-client-plan.html?client=${c.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="Plan"><i class="ti ti-clipboard-list" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></a>
         <a href="coach-checkins.html?client=${c.id}" style="text-decoration:none; display:flex; align-items:center; justify-content:center; width:32px; height:32px;" title="Check-ins"><i class="ti ti-chevron-right" style="font-size:18px; color:var(--latte);" aria-hidden="true"></i></a>
@@ -94,6 +98,28 @@
 
   document.querySelectorAll('[data-view-as]').forEach((btn) => {
     btn.addEventListener('click', () => startViewAsClient(btn.dataset.viewAs, btn.dataset.viewAsName));
+  });
+
+  // Pause / Resume: narrow RPCs (supabase/coach_pause_support.sql) that only
+  // touch paused_since / paused_days. "Today" is the local date (js/phase.js).
+  async function setPaused(btn, fn, clientId, confirmText) {
+    if (!confirm(confirmText)) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    const { error } = await sb.rpc(fn, { p_client_id: clientId, p_today: localDateStr() });
+    if (error) {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      alert(`Couldn't update: ${error.message}`);
+      return;
+    }
+    window.location.reload();
+  }
+  document.querySelectorAll('[data-pause]').forEach((btn) => {
+    btn.addEventListener('click', () => setPaused(btn, 'coach_pause_client', btn.dataset.pause, 'Pause this client\'s program?'));
+  });
+  document.querySelectorAll('[data-resume]').forEach((btn) => {
+    btn.addEventListener('click', () => setPaused(btn, 'coach_resume_client', btn.dataset.resume, 'Resume this client\'s program?'));
   });
 })();
 </script>

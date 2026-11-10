@@ -6,34 +6,39 @@ const MOVA_WORDMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 4
 <path transform="matrix(1,0,0,-1,796.2889,579.6212)" d="M0 0C3.337 8.599 6.82 17.587 10.454 26.967 14.085 36.345 17.571 45.296 20.906 53.822L42.035 108.2C45.815 117.912 49.243 126.733 52.321 134.667 55.397 142.598 58.493 150.569 61.607 158.575H71.837C74.951 150.494 78.009 142.524 81.011 134.667 84.014 126.808 87.405 117.948 91.187 108.089L112.093 53.488C115.428 44.74 118.877 35.752 122.435 26.522 125.993 17.292 129.365 8.451 132.554 0H124.992C121.211 9.934 117.3 20.164 113.261 30.692 109.218 41.218 105.421 51.154 101.862 60.495L67.389 150.569H66.055L31.36 61.273C27.578 51.56 23.649 41.423 19.572 30.859 15.494 20.295 11.491 10.008 7.562 0Z"/>
 </svg>`;
 
-function computeDayWeek(phaseStartDate) {
-  const start = new Date(phaseStartDate + 'T00:00:00');
-  const now = new Date();
-  const daysSince = Math.max(0, Math.floor((now - start) / (24 * 60 * 60 * 1000)));
-  const day = (daysSince % 7) + 1;
-  const week = Math.min(4, Math.floor(daysSince / 7) + 1);
-  return { day, week };
+// Day/week math lives in js/phase.js (computePhase) so pauses are honored everywhere.
+function computeDayWeek(profileOrStartDate) {
+  const profile = typeof profileOrStartDate === 'string'
+    ? { phase_start_date: profileOrStartDate }
+    : profileOrStartDate;
+  const { day, week } = computePhase(profile);
+  return { day: day || 1, week: week || 1 };
 }
 
+// Returns the phase-related profile fields (start date, renewal, pause), or
+// null when the client has no phase_start_date yet.
 async function getPhaseStartDate(userId) {
-  const { data } = await sb.from('profiles').select('phase_start_date').eq('id', userId).single();
-  return data?.phase_start_date || null;
+  const profile = await fetchPhaseProfile(userId);
+  return profile?.phase_start_date ? profile : null;
 }
 
 async function renderHeader(container, { title, userId } = {}) {
   let dayWeekHtml = '';
+  let pausedHtml = '';
   if (userId) {
-    const phaseStartDate = await getPhaseStartDate(userId);
-    if (phaseStartDate) {
-      const { day, week } = computeDayWeek(phaseStartDate);
-      dayWeekHtml = `<p class="mwp-label mwp-daylabel">Day ${day} · Week ${week}</p>`;
+    const profile = await fetchPhaseProfile(userId);
+    const phase = computePhase(profile);
+    if (phase.day) {
+      dayWeekHtml = `<p class="mwp-label mwp-daylabel">Day ${phase.day} · Week ${phase.week}</p>`;
     }
+    if (phase.isPaused) pausedHtml = pausedBannerHtml();
   }
   container.innerHTML = `
     <div class="mwp-header">
       <div class="mwp-logo">${MOVA_WORDMARK_SVG}</div>
     </div>
     ${dayWeekHtml}
+    ${pausedHtml}
     ${title ? `<p class="mwp-section-title">${title}</p>` : ''}`;
 }
 

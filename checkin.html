@@ -29,6 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/phase.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/viewAs.js"></script>
 <script>
@@ -273,11 +274,8 @@ async function submit() {
   isReadOnly = viewer.isReadOnly;
   renderViewAsBanner(viewer.viewAsName);
 
-  const [phaseStartDate, profileRes] = await Promise.all([
-    getPhaseStartDate(userId),
-    sb.from('profiles').select('extended_tracking').eq('id', userId).single(),
-  ]);
-  weekNumber = phaseStartDate ? computeDayWeek(phaseStartDate).week : 1;
+  const profileRes = await sb.from('profiles').select(`extended_tracking, ${PHASE_PROFILE_COLUMNS}`).eq('id', userId).single();
+  weekNumber = computePhase(profileRes.data).week || 1;
   isExtended = !!profileRes.data?.extended_tracking;
 
   render();

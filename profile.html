@@ -25,8 +25,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/phase.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/viewAs.js"></script>
+<script src="js/migraineSleep.js"></script>
 <script>
 let userId, isReadOnly;
 
@@ -116,10 +118,11 @@ function statTile(value, label) {
 }
 
 async function loadAndRender() {
-  const [profileRes, weightRes, photosRes] = await Promise.all([
+  const [profileRes, weightRes, photosRes, migraineSleepItems] = await Promise.all([
     sb.from('profiles').select('*').eq('id', userId).single(),
     sb.from('body_weight_logs').select('*').eq('user_id', userId).order('logged_at', { ascending: true }),
     sb.from('progress_photos').select('*').eq('user_id', userId).order('taken_at', { ascending: false }).limit(2),
+    fetchMigraineSleepItems(userId),
   ]);
 
   const profile = profileRes.data;
@@ -191,6 +194,17 @@ async function loadAndRender() {
     </div>
     <input type="file" id="photoInput" accept="image/*" style="display:none;" />
     <p id="photoError" class="mwp-error" style="display:none;"></p>
+
+    ${migraineSleepItems.length ? `
+      <a href="migraine-sleep.html" style="display:flex; align-items:center; gap:12px; text-decoration:none; background:var(--froth); border-radius:12px; padding:14px; margin:1.3rem 0 0.5rem;">
+        <i class="ti ti-moon" style="font-size:19px; color:var(--ink);" aria-hidden="true"></i>
+        <div style="flex:1; min-width:0;">
+          <p class="mwp-title" style="font-size:14px; margin:0; color:var(--ink);">Migraine &amp; Sleep</p>
+          <p class="mwp-body" style="font-size:11.5px; color:var(--latte); margin:2px 0 0;">${migraineSleepItems.length} ${migraineSleepItems.length === 1 ? 'item' : 'items'} from your coach</p>
+        </div>
+        <i class="ti ti-chevron-right" style="font-size:16px; color:var(--latte);" aria-hidden="true"></i>
+      </a>
+    ` : ''}
 
     ${profile.is_coach ? `
       <a href="coach-clients.html" class="mwp-btn" style="display:block; text-decoration:none; box-sizing:border-box; text-align:center; margin-top:0.5rem;">Coach View: Clients</a>

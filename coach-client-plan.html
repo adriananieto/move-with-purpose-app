@@ -25,7 +25,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/phase.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/migraineSleep.js"></script>
 <script>
 const MEAL_LABELS = { breakfast: 'Breakfast', snack_am: 'Snack AM', lunch: 'Lunch', snack_pm: 'Snack PM', dinner: 'Dinner' };
 const MEAL_ORDER = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
@@ -130,7 +132,7 @@ function mealOptionsGroup(type, options, target) {
   (mealTargetsRes.data || []).forEach((t) => { mealTargets[t.meal_type] = t; });
 
   const foodsByCategory = {};
-  (foodsRes.data || []).forEach((f) => { (foodsByCategory[f.category] ||= []).push(f); });
+  withoutMigraineSleep(foodsRes.data).forEach((f) => { (foodsByCategory[f.category] ||= []).push(f); });
 
   const optionsByMeal = {};
   (optionsRes.data || []).forEach((o) => { (optionsByMeal[o.meal_type] ||= []).push(o); });
